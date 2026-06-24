@@ -77,9 +77,10 @@ REM Copy station config (YAML)
 copy "config\stations\te_rwizi.yaml" "dist\StationDeck\config\stations\te_rwizi.yaml" >nul
 echo     Copied: config\stations\te_rwizi.yaml
 
-REM Copy version file — required by the auto-update checker
-copy "config\version.txt" "dist\StationDeck\config\version.txt" >nul
-echo     Copied: config\version.txt
+REM Write version file directly from AppVersion — never gets out of sync
+set STATIONDECK_VERSION=1.0.2
+echo %STATIONDECK_VERSION%> "dist\StationDeck\config\version.txt"
+echo     Written: config\version.txt (%STATIONDECK_VERSION%)
 
 REM Copy .env template if .env doesn't already exist in dist
 if not exist "dist\StationDeck\.env" (
