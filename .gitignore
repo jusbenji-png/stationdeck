@@ -1,0 +1,23 @@
+# PyInstaller build output
+build/
+dist/
+
+# Secrets and machine-specific files
+.env
+config/license.key
+config/auth.json
+
+# Station data — never commit
+data/
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Test/temp files
+*.jpg
+*.jpeg
+test_crop_*
+test_tiled_*
