@@ -75,10 +75,9 @@ def get_installed_version() -> str:
     import sys
 
     if getattr(sys, 'frozen', False):
-        # Running as .exe — executable is in the install folder
-        base = Path(sys.executable).parent
+        # PyInstaller extracts bundled data into _MEIPASS (_internal/), not next to the exe
+        base = Path(sys._MEIPASS)
     else:
-        # Running as .py — go up from src/ to project root
         base = Path(__file__).resolve().parent.parent
 
     version_file = base / "config" / "version.txt"
