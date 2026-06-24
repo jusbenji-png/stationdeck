@@ -263,13 +263,14 @@ def register_submit():
     machine_id = get_machine_id(STATION_ID)
 
     success, message, license_key = register_station(
-        station_name = data.get("station_name", "").strip(),
-        password     = data.get("password", ""),
-        email        = data.get("email", "").strip(),
-        phone        = data.get("phone", "").strip(),
-        region       = data.get("region", "").strip(),
-        location     = data.get("location", "").strip(),
-        machine_id   = machine_id,
+        station_name    = data.get("station_name", "").strip(),
+        password        = data.get("password", ""),
+        email           = data.get("email", "").strip(),
+        phone           = data.get("phone", "").strip(),
+        region          = data.get("region", "").strip(),
+        location        = data.get("location", "").strip(),
+        machine_id      = machine_id,
+        app_station_id  = STATION_ID,
     )
 
     if success:
@@ -1198,6 +1199,11 @@ def _available_fy_options(coverage: dict) -> list:
 # ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Start the background update checker so the dashboard banner works
+    # when running via `python web\app.py` (not just via launcher.py).
+    from src.updater import start_update_check
+    start_update_check()
+
     local_ip = _get_local_ip()
     print("\n" + "=" * 55)
     print("  StationDeck Web Dashboard")

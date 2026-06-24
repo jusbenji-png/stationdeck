@@ -8,7 +8,7 @@ TIMEOUT = 10  # seconds before giving up on a request
 
 
 def register_station(station_name, password, email, phone,
-                     region, location, machine_id):
+                     region, location, machine_id, app_station_id=None):
     """
     Register a new station with the auth server.
     Returns: (success: bool, message: str, license_key: str or None)
@@ -21,9 +21,10 @@ def register_station(station_name, password, email, phone,
                 "password":     password,
                 "email":        email,
                 "phone":        phone,
-                "region":       region,
-                "location":     location,
-                "machine_id":   machine_id
+                "region":          region,
+                "location":        location,
+                "machine_id":      machine_id,
+                "app_station_id":  app_station_id or station_name,
             },
             timeout=TIMEOUT
         )
