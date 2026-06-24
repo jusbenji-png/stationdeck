@@ -1,0 +1,5 @@
+content = open('web/templates/login.html', encoding='utf-8').read()
+content = content.replace('e.g. TotalEnergies Rwizi', 'e.g. Uganda Fuel')
+content = content.replace('StationDeck &mdash; TotalEnergies Rwizi, Mbarara', 'StationDeck &mdash; Fuel Station Reporting System')
+open('web/templates/login.html', 'w', encoding='utf-8').write(content)
+print('Done')

@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Settings — StationDeck{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+
+    <div class="page-header">
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">License status, station details, and data backup</p>
+    </div>
+
+    <!-- ── LICENSE STATUS CARD ─────────────────────────────────────── -->
+    <div class="settings-section">
+        <h2 class="settings-heading">
+            <span class="settings-icon">🔑</span> License
+        </h2>
+        <div class="settings-card">
+            <div class="settings-row">
+                <span class="settings-label">Status</span>
+                <span class="settings-value">
+                    {% if lic.status in ('active', 'renew_reminder') %}
+                        <span class="badge badge-green">Active</span>
+                    {% elif lic.status in ('trial', 'trial_expiring') %}
+                        <span class="badge badge-blue">Free Trial</span>
+                    {% elif lic.status == 'expiring_soon' %}
+                        <span class="badge badge-yellow">Expiring Soon</span>
+                    {% elif lic.status == 'expired' %}
+                        <span class="badge badge-red">Expired</span>
+                    {% else %}
+                        <span class="badge badge-grey">Not Activated</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% if lic.expiry %}
+            <div class="settings-row">
+                <span class="settings-label">Expiry Date</span>
+                <span class="settings-value">{{ lic.expiry }}</span>
+            </div>
+            <div class="settings-row">
+                <span class="settings-label">Days Remaining</span>
+                <span class="settings-value
+                    {% if lic.days_remaining <= 7 %} value-red
+                    {% elif lic.days_remaining <= 30 %} value-yellow
+                    {% else %} value-green{% endif %}">
+                    {{ lic.days_remaining }} day{% if lic.days_remaining != 1 %}s{% endif %}
+                </span>
+            </div>
+            {% endif %}
+            {% if lic.is_trial %}
+            <div class="settings-row">
+                <span class="settings-label">Plan</span>
+                <span class="settings-value">Free Trial</span>
+            </div>
+            {% endif %}
+            <div class="settings-row settings-row-action">
+                <span class="settings-label">Renewal / New Key</span>
+                <a href="{{ url_for('activate') }}" class="btn btn-sm btn-outline">
+                    Enter New License Key →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── MACHINE ID CARD ─────────────────────────────────────────── -->
+    <div class="settings-section">
+        <h2 class="settings-heading">
+            <span class="settings-icon">💻</span> This Computer
+        </h2>
+        <div class="settings-card">
+            <p class="settings-note">
+                Your <strong>Machine ID</strong> is a unique code tied to this computer.
+                If you get a new computer and need StationDeck transferred, send this
+                code to your support contact so they can generate a replacement license key.
+            </p>
+            <div class="settings-row">
+                <span class="settings-label">Machine ID</span>
+                <span class="settings-value">
+                    <code class="machine-id" id="machine-id-text">{{ machine_id }}</code>
+                    <button class="btn btn-sm btn-copy" onclick="copyMachineId()">
+                        📋 Copy
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STATION DETAILS CARD ────────────────────────────────────── -->
+    <div class="settings-section">
+        <h2 class="settings-heading">
+            <span class="settings-icon">⛽</span> Station Details
+        </h2>
+        <div class="settings-card">
+            <div class="settings-row">
+                <span class="settings-label">Station Name</span>
+                <span class="settings-value">{{ station_name }}</span>
+            </div>
+            <div class="settings-row">
+                <span class="settings-label">Location</span>
+                <span class="settings-value">{{ location }}</span>
+            </div>
+            {% if operator %}
+            <div class="settings-row">
+                <span class="settings-label">Operator</span>
+                <span class="settings-value">{{ operator }}</span>
+            </div>
+            {% endif %}
+            <div class="settings-row">
+                <span class="settings-label">Station ID</span>
+                <span class="settings-value"><code>{{ session.get('station_id', '') }}</code></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── CAPTURE TEMPLATES ───────────────────────────────────────── -->
+    <div class="settings-section">
+        <h2 class="settings-heading">
+            <span class="settings-icon">📋</span> Daily Capture Templates
+        </h2>
+        <div class="settings-card">
+            <p class="settings-note">
+                Download your station's daily capture sheets as a print-ready PDF.
+                All 5 sheets are in one file — print the whole pack at once and keep
+                a supply at the station for managers to fill in each shift.
+                The templates are pre-labelled with your station name and ID.
+            </p>
+
+            <div style="background: #f0f7f4; border: 1px solid #b8ddd0; border-radius: 8px;
+                        padding: 14px 16px; margin: 12px 0;">
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1f4d3d;
+                            margin-bottom: 8px;">What's included in the PDF:</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr;
+                            gap: 4px 20px; font-size: 0.82rem; color: #374151;">
+                    <div>✓ Meter Book — PMS (4 tanks)</div>
+                    <div>✓ Meter Book — AGO (4 tanks)</div>
+                    <div>✓ Cash &amp; Sales Capture</div>
+                    <div>✓ Product Sales Totals</div>
+                    <div>✓ Daily Expenses</div>
+                    <div style="color: #6b7280;">Boxes sized for clear handwriting</div>
+                </div>
+            </div>
+
+            <div class="settings-row settings-row-action" style="margin-top: 14px;">
+                <span class="settings-label">Download Templates</span>
+                <a href="{{ url_for('capture_template') }}"
+                   class="btn btn-sm btn-primary"
+                   style="background: #1f4d3d; color: #fff; text-decoration: none;
+                          padding: 8px 18px; border-radius: 7px; font-size: 0.85rem;
+                          font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    ⬇ Download Capture Templates PDF
+                </a>
+            </div>
+
+            <p style="font-size: 0.78rem; color: #9ca3af; margin-top: 10px; margin-bottom: 0;">
+                Tip: Print on A4 paper. Keep a stack of 30 sheets at the station —
+                one set per shift per day.
+            </p>
+        </div>
+    </div>
+
+    <!-- ── SOFTWARE VERSION ────────────────────────────────────────── -->
+    <div class="settings-section">
+        <h2 class="settings-heading">
+            <span class="settings-icon">🛠️</span> Software
+        </h2>
+        <div class="settings-card">
+            <div class="settings-row">
+                <span class="settings-label">StationDeck Version</span>
+                <span class="settings-value">v{{ software_version }}</span>
+            </div>
+            <div class="settings-row">
+                <span class="settings-label">Platform</span>
+                <span class="settings-value">Windows (Local Installation)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── DATA BACKUP SECTION ─────────────────────────────────────── -->
+    <div class="settings-section">
+        <h2 class="settings-heading">
+            <span class="settings-icon">💾</span> Data Backup
+        </h2>
+        <div class="settings-card">
+            <div class="backup-warning">
+                ⚠️ <strong>Important:</strong> All your StationDeck data — daily records,
+                generated reports, and the database — is stored <em>only on this computer</em>.
+                If this computer is lost, stolen, or damaged and you have no backup,
+                that data cannot be recovered. We strongly recommend copying your
+                <code>data\</code> folder to a USB drive or Google Drive at least once a month.
+            </div>
+            <h3 class="backup-steps-title">How to back up your data (3 steps)</h3>
+            <ol class="backup-steps">
+                <li>
+                    <strong>Copy the path below</strong> — that is your StationDeck data folder.
+                </li>
+                <li>
+                    <strong>Open File Explorer</strong> (Windows key + E),
+                    paste the path into the address bar, and press Enter.
+                </li>
+                <li>
+                    <strong>Copy the entire <code>data</code> folder</strong> and paste it
+                    onto your USB drive or into your Google Drive / OneDrive folder.
+                    Do this once a month — label the folder with the date, e.g.
+                    <code>data_backup_2026-05</code>.
+                </li>
+            </ol>
+            <div class="settings-row" style="margin-top: 16px;">
+                <span class="settings-label">Data Folder Path</span>
+                <span class="settings-value">
+                    <code class="machine-id" id="data-path-text">{{ data_path }}</code>
+                    <button class="btn btn-sm btn-copy" onclick="copyDataPath()">
+                        📋 Copy Path
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
+
+</div><!-- end page-wrapper -->
+
+<script>
+function copyMachineId() {
+    const text = document.getElementById("machine-id-text").innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        showCopyFeedback(event.target, "Copied!");
+    });
+}
+function copyDataPath() {
+    const text = document.getElementById("data-path-text").innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        showCopyFeedback(event.target, "Copied!");
+    });
+}
+function showCopyFeedback(btn, msg) {
+    const original = btn.innerText;
+    btn.innerText = msg;
+    btn.style.background = "#1E7E34";
+    btn.style.color = "#fff";
+    setTimeout(() => {
+        btn.innerText = original;
+        btn.style.background = "";
+        btn.style.color = "";
+    }, 1800);
+}
+</script>
+{% endblock %}

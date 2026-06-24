@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Login — StationDeck{% endblock %}
+{% block content %}
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-logo">
+            <h1>Station<span>Deck</span></h1>
+            <p>Fuel Station Reporting System</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <ul class="flash-list">
+            {% for category, message in messages %}
+            <li class="flash-msg {{ category }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label class="form-label" for="station_name">Station Name</label>
+                <input
+                    type="text"
+                    id="station_name"
+                    name="station_name"
+                    class="form-control"
+                    placeholder="e.g. Uganda Fuel"
+                    autofocus
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Station Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="form-control"
+                    placeholder="Enter your station password"
+                    required
+                >
+            </div>
+            <button type="submit" class="btn btn-primary"
+                    style="width:100%; justify-content:center; padding:12px;">
+                Log In
+            </button>
+        </form>
+
+        <p style="text-align:center; margin-top:16px; font-size:0.8rem; color:#9ca3af;">
+            New station? <a href="{{ url_for('register') }}"
+                style="color:#C8102E; text-decoration:none;">Register here</a>
+        </p>
+        <p style="text-align:center; margin-top:8px; font-size:0.8rem; color:#9ca3af;">
+            Changed computers? <a href="{{ url_for('recover') }}"
+                style="color:#C8102E; text-decoration:none;">Recover license</a>
+        </p>
+        <p style="text-align:center; margin-top:16px; font-size:0.8rem; color:#9ca3af;">
+            StationDeck &mdash; Fuel Station Reporting System
+        </p>
+    </div>
+</div>
+{% endblock %}

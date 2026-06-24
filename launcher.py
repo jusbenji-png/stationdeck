@@ -1,0 +1,254 @@
+"""
+launcher.py
+-----------
+StationDeck — Windows Desktop Launcher
+
+Entry point for the PyInstaller .exe build.
+
+What it does:
+  1. Adds correct paths so all imports resolve
+  2. Starts Flask in a background thread (no terminal)
+  3. Waits until Flask is ready (polls localhost:5000)
+  4. Opens the default browser to http://localhost:5000
+  5. Keeps running until process is killed
+  6. Binds to 0.0.0.0 so any device on the same WiFi can access the dashboard
+  7. Starts the auto-update check in the background after Flask is ready
+
+The manager sees:
+  - Browser opens automatically to the login page
+  - No terminal window, no Python visible
+  - Local network IP shown in dashboard for other devices
+  - Update banner on dashboard if a new version is available
+
+Usage in development:
+  python launcher.py
+
+Usage as .exe:
+  StationDeck.exe
+"""
+
+import sys
+import os
+import time
+import threading
+import webbrowser
+import traceback
+import socket
+from pathlib import Path
+
+# ── Path setup ────────────────────────────────────────────────────────────────
+if getattr(sys, 'frozen', False):
+    BUNDLE_DIR  = Path(sys._MEIPASS)
+    INSTALL_DIR = Path(sys.executable).parent
+    if str(BUNDLE_DIR) not in sys.path:
+        sys.path.insert(0, str(BUNDLE_DIR))
+else:
+    BUNDLE_DIR  = Path(__file__).parent
+    INSTALL_DIR = Path(__file__).parent
+    if str(BUNDLE_DIR) not in sys.path:
+        sys.path.insert(0, str(BUNDLE_DIR))
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+# Bind to 0.0.0.0 so the app is reachable from any device on the same WiFi.
+# The browser on this PC still opens to 127.0.0.1 (localhost) as normal.
+HOST      = "0.0.0.0"
+PORT      = 5000
+LOCAL_URL = f"http://127.0.0.1:{PORT}"      # used by THIS PC's browser
+TIMEOUT   = 30
+
+
+# ── Local IP detection ────────────────────────────────────────────────────────
+
+def _get_local_ip() -> str:
+    """
+    Return the machine's LAN IP address (e.g. 192.168.3.44).
+
+    Technique: open a UDP socket toward an external address.
+    No data is actually sent — this just makes the OS choose
+    which network interface it would use, and we read that IP.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(1)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        pass
+    try:
+        return socket.gethostbyname(socket.gethostname())
+    except Exception:
+        return "unknown"
+
+
+# ── Startup log ───────────────────────────────────────────────────────────────
+
+def _get_log_path() -> Path:
+    if getattr(sys, 'frozen', False):
+        base = Path(sys.executable).parent
+    else:
+        base = Path(__file__).parent
+    log_dir = base / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "startup.log"
+
+
+def _log(msg: str):
+    """Write a timestamped line to the startup log and print it."""
+    line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
+    try:
+        with open(_get_log_path(), "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+    try:
+        print(line)
+    except Exception:
+        pass
+
+
+# ── Directory setup ───────────────────────────────────────────────────────────
+
+def _ensure_dirs():
+    """Create all essential directories before Flask starts."""
+    try:
+        from config.settings import BASE_DIR
+        dirs = [
+            BASE_DIR / "data" / "input",
+            BASE_DIR / "data" / "processed",
+            BASE_DIR / "data" / "ocr_temp",
+            BASE_DIR / "data" / "ocr_audit",
+            BASE_DIR / "logs",
+            BASE_DIR / "reports" / "te_rwizi" / "pdf",
+            BASE_DIR / "reports" / "te_rwizi" / "docx",
+            BASE_DIR / "reports" / "te_rwizi" / "xlsx",
+            BASE_DIR / "reports" / "te_rwizi" / "archive",
+            BASE_DIR / "config" / "stations",
+        ]
+        for d in dirs:
+            d.mkdir(parents=True, exist_ok=True)
+        _log("Directories verified.")
+    except Exception as e:
+        _log(f"WARNING: _ensure_dirs() failed: {e}")
+
+
+# ── Flask thread ──────────────────────────────────────────────────────────────
+
+_flask_error: list = []
+
+
+def _run_flask():
+    """Start Flask in this daemon thread."""
+    try:
+        _log("Flask thread starting...")
+        _ensure_dirs()
+
+        from web.app import app
+        _log("Flask app imported successfully.")
+        _log(f"Binding to {HOST}:{PORT} (accessible on local network)...")
+
+        local_ip = _get_local_ip()
+        if local_ip != "unknown":
+            _log(f"Network access: http://{local_ip}:{PORT}")
+        else:
+            _log("Could not detect local IP — network access may be unavailable.")
+
+        app.run(
+            host=HOST,
+            port=PORT,
+            debug=False,
+            use_reloader=False,
+            threaded=True,
+        )
+
+    except Exception:
+        err = traceback.format_exc()
+        _log(f"FATAL: Flask thread crashed:\n{err}")
+        _flask_error.append(err)
+
+
+# ── Health check ──────────────────────────────────────────────────────────────
+
+def _wait_for_flask(timeout: int = TIMEOUT) -> bool:
+    """Poll localhost:5000 until Flask responds or we time out."""
+    import urllib.request
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _flask_error:
+            return False
+        try:
+            urllib.request.urlopen(LOCAL_URL, timeout=1)
+            return True
+        except Exception:
+            time.sleep(0.3)
+    return False
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def main():
+    _log("=" * 50)
+    _log("StationDeck launcher starting")
+    _log(f"Python: {sys.version}")
+    _log(f"Frozen: {getattr(sys, 'frozen', False)}")
+    if getattr(sys, 'frozen', False):
+        _log(f"Executable: {sys.executable}")
+        _log(f"Bundle dir: {sys._MEIPASS}")
+
+    local_ip = _get_local_ip()
+    _log(f"This machine's local IP: {local_ip}")
+    if local_ip != "unknown":
+        _log(f"Other devices on this WiFi can access: http://{local_ip}:{PORT}")
+    _log("=" * 50)
+
+    # Start Flask daemon thread
+    flask_thread = threading.Thread(target=_run_flask, daemon=True)
+    flask_thread.start()
+
+    _log(f"Waiting for Flask on {LOCAL_URL}...")
+    ready = _wait_for_flask()
+
+    if _flask_error:
+        _log("Flask failed to start. Check logs/startup.log for details.")
+        time.sleep(3)
+        sys.exit(1)
+
+    if ready:
+        _log("Flask ready — opening browser.")
+        webbrowser.open(LOCAL_URL)
+    else:
+        _log(
+            f"Flask did not respond within {TIMEOUT}s. "
+            f"Try opening {LOCAL_URL} manually."
+        )
+        webbrowser.open(LOCAL_URL)
+
+    # ── Start update check in background ─────────────────────────────────────
+    # We do this AFTER Flask is confirmed ready so it never delays startup.
+    # The check runs silently — if the server is unreachable, nothing happens.
+    # Result is stored in src/updater.py and read by the /check_update route.
+    try:
+        from src.updater import start_update_check
+        start_update_check()
+        _log("Update check started in background.")
+    except Exception as e:
+        _log(f"WARNING: Could not start update checker: {e}")
+        # Not fatal — app runs fine without update checking
+
+    # Keep main thread alive so the daemon Flask thread keeps running
+    try:
+        while flask_thread.is_alive():
+            time.sleep(1)
+        if _flask_error:
+            _log("Flask thread exited with an error. Check logs/startup.log.")
+        else:
+            _log("Flask thread exited cleanly.")
+    except KeyboardInterrupt:
+        _log("StationDeck shutting down (KeyboardInterrupt).")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

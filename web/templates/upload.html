@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Upload Data — StationDeck{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+
+    <div class="page-header">
+        <h1>Upload Daily Cash Flow Data</h1>
+        <p>Import your Excel file to update the station database.</p>
+    </div>
+
+    <div class="card" style="max-width: 600px;">
+        <div class="card-title">
+            <span class="dot"></span>
+            Select Excel File
+        </div>
+
+        <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data"
+              id="upload-form">
+
+            <div class="form-group">
+                <label class="upload-zone" for="excel_file" id="upload-zone">
+                    <div class="upload-zone-icon">📊</div>
+                    <div class="upload-zone-text" id="zone-text">
+                        Click to select your Daily Cash Flow Excel file
+                    </div>
+                    <div class="upload-zone-sub">Accepts .xlsx or .xls files</div>
+                    <input type="file" name="excel_file" id="excel_file"
+                           accept=".xlsx,.xls" onchange="fileSelected(this)">
+                </label>
+            </div>
+
+            <div class="form-group" style="margin-top: 8px;">
+                <button type="submit" class="btn btn-primary" id="upload-btn" style="width:100%; justify-content:center;">
+                    Import into Database
+                </button>
+            </div>
+
+        </form>
+
+        <div style="margin-top: 20px; padding: 14px 16px; background: #f8fafc;
+                    border-radius: 8px; font-size: 0.85rem; color: #6b7280;
+                    border: 1px solid #e2e8f0;">
+            <strong style="color: #374151;">What happens when you upload?</strong><br><br>
+            1. The file is saved to <code>data/input/</code><br>
+            2. All daily records are read and imported into the database<br>
+            3. Existing records for the same dates are updated (no duplicates)<br>
+            4. You can then generate reports for any month in the file
+        </div>
+
+    </div>
+
+    <div class="card" style="max-width: 600px;">
+        <div class="card-title">
+            <span class="dot"></span>
+            Accepted File Format
+        </div>
+        <div style="font-size: 0.88rem; color: #6b7280; line-height: 1.8;">
+            The file must be the <strong style="color:#1f2937;">Daily Cash Flow Excel workbook</strong>
+            with a sheet named <strong style="color:#1f2937;">CASH FLOW</strong>.<br><br>
+            It should contain columns including: date, PMS volume, AGO volume,
+            revenues, expenses, cash banked, and delta.<br><br>
+            Files with multiple months of data are fully supported — all records
+            will be imported at once.
+        </div>
+    </div>
+
+</div>
+
+<script>
+function fileSelected(input) {
+    const zoneText = document.getElementById('zone-text');
+    if (input.files && input.files[0]) {
+        zoneText.textContent = '✅ ' + input.files[0].name + ' selected';
+        zoneText.style.color = '#065f46';
+    }
+}
+
+// Drag and drop support
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        document.getElementById('excel_file').files = files;
+        fileSelected(document.getElementById('excel_file'));
+    }
+});
+</script>
+
+{% endblock %}

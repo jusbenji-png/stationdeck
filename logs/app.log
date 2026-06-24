@@ -1,0 +1,342 @@
+2026-05-20 11:46:45 | INFO     | stationdeck | === StationDeck run started: April 2026 ===
+2026-05-20 11:46:45 | DEBUG    | stationdeck | Inputs validated: month=4, year=2026
+2026-05-20 11:46:53 | INFO     | stationdeck | Processor complete. Fuel revenue: 913,735,117
+2026-05-20 11:46:53 | INFO     | stationdeck | AI engine complete. Mode=placeholder, sections=9
+2026-05-20 11:46:53 | ERROR    | stationdeck | Export failed: 'NoneType' object has no attribute 'iterrows'
+Traceback (most recent call last):
+  File "C:\Users\LENOVO\stationdeck\main.py", line 203, in main
+    xlsx_path = engine.generate_xlsx(metrics, daily_df, stamped_stem)
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 431, in generate_xlsx
+    self._xlsx_daily_sheet(wb, daily_df, period_label)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 525, in _xlsx_daily_sheet
+    for i,(_,row_data) in enumerate(daily_df.iterrows()):
+                                    ^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'iterrows'
+2026-05-20 11:54:12 | INFO     | stationdeck | === StationDeck run started: April 2026 ===
+2026-05-20 11:54:12 | DEBUG    | stationdeck | Inputs validated: month=4, year=2026
+2026-05-20 11:54:20 | INFO     | stationdeck | Processor complete. Fuel revenue: 913,735,117
+2026-05-20 11:54:20 | INFO     | stationdeck | AI engine complete. Mode=placeholder, sections=9
+2026-05-20 11:54:20 | ERROR    | stationdeck | Export failed: 'NoneType' object has no attribute 'iterrows'
+Traceback (most recent call last):
+  File "C:\Users\LENOVO\stationdeck\main.py", line 203, in main
+    xlsx_path = engine.generate_xlsx(metrics, daily_df, stamped_stem)
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 431, in generate_xlsx
+    self._xlsx_daily_sheet(wb, daily_df, period_label)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 525, in _xlsx_daily_sheet
+    for i,(_,row_data) in enumerate(daily_df.iterrows()):
+                                    ^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'iterrows'
+2026-05-20 22:40:06 | INFO     | stationdeck | === StationDeck run started: April 2026 ===
+2026-05-20 22:40:06 | DEBUG    | stationdeck | Inputs validated: month=4, year=2026
+2026-05-20 22:40:13 | INFO     | stationdeck | Processor complete. Fuel revenue: 913,735,117
+2026-05-20 22:40:13 | INFO     | stationdeck | AI engine complete. Mode=placeholder, sections=9
+2026-05-20 22:40:14 | INFO     | stationdeck | Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_April_2026_20260520.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_April_2026_20260520.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_April_2026_20260520.xlsx
+2026-05-20 22:40:14 | INFO     | stationdeck | === Run complete in 7.8s ===
+2026-05-20 22:40:17 | INFO     | stationdeck | === StationDeck run started: April 2026 ===
+2026-05-20 22:40:17 | DEBUG    | stationdeck | Inputs validated: month=4, year=2026
+2026-05-20 22:40:24 | INFO     | stationdeck | Processor complete. Fuel revenue: 913,735,117
+2026-05-20 22:40:24 | INFO     | stationdeck | AI engine complete. Mode=placeholder, sections=9
+2026-05-20 22:40:25 | INFO     | stationdeck | Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_April_2026_20260520.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_April_2026_20260520.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_April_2026_20260520.xlsx
+2026-05-20 22:40:25 | INFO     | stationdeck | === Run complete in 8.0s ===
+2026-05-22 01:00:05 | INFO     | stationdeck | === StationDeck run started: May 2026 ===
+2026-05-22 01:00:05 | DEBUG    | stationdeck | Inputs validated: month=5, year=2026
+2026-05-22 01:00:11 | INFO     | stationdeck | === StationDeck run started: May 2026 ===
+2026-05-22 01:00:11 | DEBUG    | stationdeck | Inputs validated: month=5, year=2026
+2026-05-22 01:00:14 | INFO     | stationdeck | Processor complete. Fuel revenue: 82,117,452
+2026-05-22 01:00:14 | INFO     | stationdeck | AI engine complete. Mode=placeholder, sections=9
+2026-05-22 01:00:14 | INFO     | stationdeck | Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 01:00:14 | INFO     | stationdeck | === Run complete in 8.8s ===
+2026-05-22 01:00:18 | INFO     | stationdeck | Processor complete. Fuel revenue: 82,117,452
+2026-05-22 01:00:18 | INFO     | stationdeck | AI engine complete. Mode=placeholder, sections=9
+2026-05-22 01:00:18 | INFO     | stationdeck | Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 01:00:18 | INFO     | stationdeck | === Run complete in 7.5s ===
+2026-05-22 01:04:14,150 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 01:04:14,151 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 01:04:21,052 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 01:04:21,053 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 01:04:21,258 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 01:04:21,315 - INFO - === Run complete in 7.2s ===
+2026-05-22 01:04:33,887 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 01:04:33,888 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 01:04:42,976 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 01:04:42,977 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 01:04:43,354 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 01:04:43,396 - INFO - === Run complete in 9.5s ===
+2026-05-22 15:33:16,324 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 15:33:16,325 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 15:33:27,858 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 15:33:27,860 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 15:33:28,333 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 15:33:28,766 - INFO - Archived: StationDeck_Report_May_2026_20260522.pdf -> archive/2026-05/
+2026-05-22 15:33:28,776 - INFO - Archived: StationDeck_Report_May_2026_20260522.docx -> archive/2026-05/
+2026-05-22 15:33:28,785 - INFO - Archived: StationDeck_Report_May_2026_20260522.xlsx -> archive/2026-05/
+2026-05-22 15:33:28,799 - INFO - === Run complete in 12.5s ===
+2026-05-22 23:27:57,020 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:27:57,022 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:28:15,822 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:28:15,822 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:28:15,902 - ERROR - Export failed: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+Traceback (most recent call last):
+  File "C:\Users\LENOVO\stationdeck\main.py", line 138, in main
+    pdf_path  = engine.generate_pdf(metrics, sections, stamped_stem)
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 161, in generate_pdf
+    print(f"  \u2705 PDF saved: {filepath}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LENOVO\AppData\Local\Programs\Python\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+2026-05-22 23:38:40,217 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:38:40,218 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:38:53,555 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:38:53,556 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:38:53,915 - ERROR - Export failed: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+Traceback (most recent call last):
+  File "C:\Users\LENOVO\stationdeck\main.py", line 138, in main
+    pdf_path  = engine.generate_pdf(metrics, sections, stamped_stem)
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 161, in generate_pdf
+    print(f"  \u2705 PDF saved: {filepath}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LENOVO\AppData\Local\Programs\Python\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+2026-05-22 23:39:13,911 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:39:13,911 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:39:26,992 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:39:26,993 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:39:27,058 - ERROR - Export failed: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+Traceback (most recent call last):
+  File "C:\Users\LENOVO\stationdeck\main.py", line 138, in main
+    pdf_path  = engine.generate_pdf(metrics, sections, stamped_stem)
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 161, in generate_pdf
+    print(f"  \u2705 PDF saved: {filepath}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LENOVO\AppData\Local\Programs\Python\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+2026-05-22 23:40:30,972 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:40:30,973 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:40:44,255 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:40:44,256 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:40:44,340 - ERROR - Export failed: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+Traceback (most recent call last):
+  File "C:\Users\LENOVO\stationdeck\main.py", line 138, in main
+    pdf_path  = engine.generate_pdf(metrics, sections, stamped_stem)
+  File "C:\Users\LENOVO\stationdeck\src\exporter.py", line 161, in generate_pdf
+    print(f"  \u2705 PDF saved: {filepath}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LENOVO\AppData\Local\Programs\Python\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+2026-05-22 23:43:46,855 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:43:46,855 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:43:58,942 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:43:58,943 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:43:59,464 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 23:43:59,475 - INFO - Archived: StationDeck_Report_May_2026_20260522.pdf -> archive/2026-05/
+2026-05-22 23:43:59,479 - INFO - Archived: StationDeck_Report_May_2026_20260522.docx -> archive/2026-05/
+2026-05-22 23:43:59,483 - INFO - Archived: StationDeck_Report_May_2026_20260522.xlsx -> archive/2026-05/
+2026-05-22 23:43:59,483 - INFO - === Run complete in 12.6s ===
+2026-05-22 23:44:47,314 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:44:47,314 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:44:58,875 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:44:58,876 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:44:59,269 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 23:44:59,275 - INFO - Archived: StationDeck_Report_May_2026_20260522.pdf -> archive/2026-05/
+2026-05-22 23:44:59,279 - INFO - Archived: StationDeck_Report_May_2026_20260522.docx -> archive/2026-05/
+2026-05-22 23:44:59,285 - INFO - Archived: StationDeck_Report_May_2026_20260522.xlsx -> archive/2026-05/
+2026-05-22 23:44:59,285 - INFO - === Run complete in 12.0s ===
+2026-05-22 23:50:10,210 - INFO - === StationDeck run started: May 2026 ===
+2026-05-22 23:50:10,212 - DEBUG - Inputs validated: month=5, year=2026
+2026-05-22 23:50:20,620 - INFO - Processor complete. Fuel revenue: 82,117,452
+2026-05-22 23:50:20,621 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-22 23:50:20,986 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_May_2026_20260522.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_May_2026_20260522.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_May_2026_20260522.xlsx
+2026-05-22 23:50:20,991 - INFO - Archived: StationDeck_Report_May_2026_20260522.pdf -> archive/2026-05/
+2026-05-22 23:50:21,070 - INFO - Archived: StationDeck_Report_May_2026_20260522.docx -> archive/2026-05/
+2026-05-22 23:50:21,075 - INFO - Archived: StationDeck_Report_May_2026_20260522.xlsx -> archive/2026-05/
+2026-05-22 23:50:21,075 - INFO - === Run complete in 10.9s ===
+2026-05-24 12:28:19,513 - INFO - === StationDeck run started: April 2026 ===
+2026-05-24 12:28:19,515 - DEBUG - Inputs validated: month=4, year=2026
+2026-05-24 12:28:26,758 - INFO - Processor complete. Fuel revenue: 913,735,117
+2026-05-24 12:28:26,758 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-24 12:28:27,309 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_April_2026_20260524.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_April_2026_20260524.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_April_2026_20260524.xlsx
+2026-05-24 12:28:27,313 - INFO - Archived: StationDeck_Report_April_2026_20260524.pdf -> archive/2026-04/
+2026-05-24 12:28:27,315 - INFO - Archived: StationDeck_Report_April_2026_20260524.docx -> archive/2026-04/
+2026-05-24 12:28:27,317 - INFO - Archived: StationDeck_Report_April_2026_20260524.xlsx -> archive/2026-04/
+2026-05-24 12:28:30,757 - INFO - === Run complete in 11.2s. Email sent: False ===
+2026-05-24 12:35:29,947 - INFO - === StationDeck run started: April 2026 ===
+2026-05-24 12:35:29,948 - DEBUG - Inputs validated: month=4, year=2026
+2026-05-24 12:35:37,522 - INFO - Processor complete. Fuel revenue: 913,735,117
+2026-05-24 12:35:37,522 - INFO - AI engine complete. Mode=placeholder, sections=9
+2026-05-24 12:35:38,022 - INFO - Exports: PDF=C:\Users\LENOVO\stationdeck\reports\pdf\StationDeck_Report_April_2026_20260524.pdf, DOCX=C:\Users\LENOVO\stationdeck\reports\docx\StationDeck_Report_April_2026_20260524.docx, XLSX=C:\Users\LENOVO\stationdeck\reports\xlsx\StationDeck_Report_April_2026_20260524.xlsx
+2026-05-24 12:35:38,029 - INFO - Archived: StationDeck_Report_April_2026_20260524.pdf -> archive/2026-04/
+2026-05-24 12:35:38,034 - INFO - Archived: StationDeck_Report_April_2026_20260524.docx -> archive/2026-04/
+2026-05-24 12:35:38,038 - INFO - Archived: StationDeck_Report_April_2026_20260524.xlsx -> archive/2026-04/
+2026-05-24 12:35:43,702 - INFO - === Run complete in 13.8s. Email sent: True ===
+2026-05-26 07:23:41,238 - INFO - =======================================================
+2026-05-26 07:23:41,241 - INFO -   StationDeck Pipeline Started
+2026-05-26 07:23:41,242 - INFO -   Station : te_rwizi
+2026-05-26 07:23:41,242 - INFO -   Period  : April 2026
+2026-05-26 07:23:41,243 - INFO -   Started : 2026-05-26 07:23:41
+2026-05-26 07:23:41,244 - INFO - =======================================================
+2026-05-26 07:23:41,245 - INFO - 
+[1/6] Loading station config...
+2026-05-26 07:23:41,255 - INFO -   ✅ Station: TotalEnergies Rwizi (Mbarara, Uganda)
+2026-05-26 07:23:41,262 - INFO - 
+[2/6] Processing data...
+2026-05-26 07:23:47,677 - INFO -   ✅ Metrics built — 30 days | Fuel Rev: UGX 913,735,117
+2026-05-26 07:23:47,678 - INFO - 
+[3/6] Generating AI narrative...
+2026-05-26 07:23:47,679 - INFO -   ✅ Report generated (mode: placeholder)
+2026-05-26 07:23:47,679 - INFO - 
+[4/6] Exporting reports...
+2026-05-26 07:23:47,680 - ERROR -   ❌ Export failed: ExportEngine.__init__() got an unexpected keyword argument 'station_config'
+2026-05-26 07:26:37,933 - INFO - =======================================================
+2026-05-26 07:26:37,934 - INFO -   StationDeck Pipeline Started
+2026-05-26 07:26:37,934 - INFO -   Station : te_rwizi
+2026-05-26 07:26:37,934 - INFO -   Period  : April 2026
+2026-05-26 07:26:37,935 - INFO -   Started : 2026-05-26 07:26:37
+2026-05-26 07:26:37,935 - INFO - =======================================================
+2026-05-26 07:26:37,936 - INFO - 
+[1/6] Loading station config...
+2026-05-26 07:26:37,940 - INFO -   ✅ Station: TotalEnergies Rwizi (Mbarara, Uganda)
+2026-05-26 07:26:37,942 - INFO - 
+[2/6] Processing data...
+2026-05-26 07:26:44,572 - INFO -   ✅ Metrics built — 30 days | Fuel Rev: UGX 913,735,117
+2026-05-26 07:26:44,572 - INFO - 
+[3/6] Generating AI narrative...
+2026-05-26 07:26:44,573 - INFO -   ✅ Report generated (mode: placeholder)
+2026-05-26 07:26:44,574 - INFO - 
+[4/6] Exporting reports...
+2026-05-26 07:26:45,036 - INFO -   ✅ PDF  → StationDeck_Report_April_2026_20260526.pdf
+2026-05-26 07:26:45,037 - INFO -   ✅ DOCX → StationDeck_Report_April_2026_20260526.docx
+2026-05-26 07:26:45,038 - INFO -   ✅ XLSX → StationDeck_Report_April_2026_20260526.xlsx
+2026-05-26 07:26:45,039 - INFO - 
+[5/6] Archiving reports...
+2026-05-26 07:26:45,043 - INFO - Archived: StationDeck_Report_April_2026_20260526.pdf → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-05-26 07:26:45,046 - INFO - Archived: StationDeck_Report_April_2026_20260526.docx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-05-26 07:26:45,052 - INFO - Archived: StationDeck_Report_April_2026_20260526.xlsx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-05-26 07:26:45,054 - INFO -   ✅ All files archived
+2026-05-26 07:26:45,054 - INFO - 
+[6/6] Sending email...
+2026-05-26 07:26:51,589 - INFO -   Email: Sent
+2026-05-26 07:26:51,590 - INFO - 
+=======================================================
+2026-05-26 07:26:51,592 - INFO -   ✅ Pipeline complete: April 2026
+2026-05-26 07:26:51,593 - INFO -   Station  : TotalEnergies Rwizi
+2026-05-26 07:26:51,595 - INFO -   Duration : 13.7 seconds
+2026-05-26 07:26:51,596 - INFO - =======================================================
+
+2026-06-16 20:12:23,578 - INFO - =======================================================
+2026-06-16 20:12:23,580 - INFO -   StationDeck Pipeline Started
+2026-06-16 20:12:23,581 - INFO -   Station : te_rwizi
+2026-06-16 20:12:23,582 - INFO -   Period  : April 2026
+2026-06-16 20:12:23,583 - INFO -   Started : 2026-06-16 20:12:23
+2026-06-16 20:12:23,583 - INFO - =======================================================
+2026-06-16 20:12:23,584 - INFO - 
+[1/6] Loading station config...
+2026-06-16 20:12:23,592 - INFO -   ✅ Station: TotalEnergies Rwizi (Mbarara, Uganda)
+2026-06-16 20:12:23,597 - INFO - 
+[2/6] Processing data...
+2026-06-16 20:12:32,479 - INFO -   ✅ Metrics built — 30 days | Fuel Rev: UGX 913,735,117
+2026-06-16 20:12:32,479 - INFO - 
+[3/6] Generating AI narrative...
+2026-06-16 20:12:32,480 - INFO -   ✅ Report generated (mode: placeholder)
+2026-06-16 20:12:32,481 - INFO - 
+[4/6] Exporting reports...
+2026-06-16 20:12:33,489 - INFO -   ✅ PDF  → StationDeck_Report_April_2026.pdf
+2026-06-16 20:12:33,490 - INFO -   ✅ DOCX → StationDeck_Report_April_2026.docx
+2026-06-16 20:12:33,491 - INFO -   ✅ XLSX → StationDeck_Report_April_2026.xlsx
+2026-06-16 20:12:33,491 - INFO - 
+[5/6] Archiving reports...
+2026-06-16 20:12:33,497 - INFO - Archived: StationDeck_Report_April_2026.pdf → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-16 20:12:33,500 - INFO - Archived: StationDeck_Report_April_2026.docx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-16 20:12:33,504 - INFO - Archived: StationDeck_Report_April_2026.xlsx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-16 20:12:33,505 - INFO -   ✅ All files archived
+2026-06-16 20:12:33,506 - INFO - 
+[6/6] Sending email...
+2026-06-16 20:12:39,523 - INFO -   Email: Sent
+2026-06-16 20:12:39,528 - INFO - 
+=======================================================
+2026-06-16 20:12:39,529 - INFO -   ✅ Pipeline complete: April 2026
+2026-06-16 20:12:39,531 - INFO -   Station  : TotalEnergies Rwizi
+2026-06-16 20:12:39,535 - INFO -   Duration : 16.0 seconds
+2026-06-16 20:12:39,536 - INFO - =======================================================
+
+2026-06-17 09:23:28,079 - INFO - =======================================================
+2026-06-17 09:23:28,111 - INFO -   StationDeck Pipeline Started
+2026-06-17 09:23:28,112 - INFO -   Station : te_rwizi
+2026-06-17 09:23:28,113 - INFO -   Period  : April 2026
+2026-06-17 09:23:28,114 - INFO -   Started : 2026-06-17 09:23:28
+2026-06-17 09:23:28,115 - INFO - =======================================================
+2026-06-17 09:23:28,116 - INFO - 
+[1/6] Loading station config...
+2026-06-17 09:23:28,127 - INFO -   ✅ Station: TotalEnergies Rwizi (Mbarara, Uganda)
+2026-06-17 09:23:28,133 - INFO - 
+[2/6] Processing data...
+2026-06-17 09:23:35,587 - INFO -   ✅ Metrics built — 30 days | Fuel Rev: UGX 913,735,117
+2026-06-17 09:23:35,588 - INFO - 
+[3/6] Generating AI narrative...
+2026-06-17 09:23:35,589 - INFO -   ✅ Report generated (mode: placeholder)
+2026-06-17 09:23:35,589 - INFO - 
+[4/6] Exporting reports...
+2026-06-17 09:23:36,726 - INFO -   ✅ PDF  → StationDeck_Report_April_2026.pdf
+2026-06-17 09:23:36,727 - INFO -   ✅ DOCX → StationDeck_Report_April_2026.docx
+2026-06-17 09:23:36,728 - INFO -   ✅ XLSX → StationDeck_Report_April_2026.xlsx
+2026-06-17 09:23:36,729 - INFO - 
+[5/6] Archiving reports...
+2026-06-17 09:23:36,743 - INFO - Archived: StationDeck_Report_April_2026.pdf → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-17 09:23:36,752 - INFO - Archived: StationDeck_Report_April_2026.docx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-17 09:23:36,762 - INFO - Archived: StationDeck_Report_April_2026.xlsx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-17 09:23:36,763 - INFO -   ✅ All files archived
+2026-06-17 09:23:36,764 - INFO - 
+[6/6] Sending email...
+2026-06-17 09:23:43,373 - INFO -   Email: Sent
+2026-06-17 09:23:43,374 - INFO - 
+=======================================================
+2026-06-17 09:23:43,375 - INFO -   ✅ Pipeline complete: April 2026
+2026-06-17 09:23:43,377 - INFO -   Station  : TotalEnergies Rwizi
+2026-06-17 09:23:43,378 - INFO -   Duration : 15.3 seconds
+2026-06-17 09:23:43,379 - INFO - =======================================================
+
+2026-06-17 09:29:36,127 - INFO - =======================================================
+2026-06-17 09:29:36,128 - INFO -   StationDeck Pipeline Started
+2026-06-17 09:29:36,129 - INFO -   Station : te_rwizi
+2026-06-17 09:29:36,129 - INFO -   Period  : April 2026
+2026-06-17 09:29:36,129 - INFO -   Started : 2026-06-17 09:29:36
+2026-06-17 09:29:36,130 - INFO - =======================================================
+2026-06-17 09:29:36,131 - INFO - 
+[1/6] Loading station config...
+2026-06-17 09:29:36,137 - INFO -   ✅ Station: TotalEnergies Rwizi (Mbarara, Uganda)
+2026-06-17 09:29:36,139 - INFO - 
+[2/6] Processing data...
+2026-06-17 09:29:43,645 - INFO -   ✅ Metrics built — 30 days | Fuel Rev: UGX 913,735,117
+2026-06-17 09:29:43,646 - INFO - 
+[3/6] Generating AI narrative...
+2026-06-17 09:29:43,646 - INFO -   ✅ Report generated (mode: placeholder)
+2026-06-17 09:29:43,647 - INFO - 
+[4/6] Exporting reports...
+2026-06-17 09:29:44,631 - INFO -   ✅ PDF  → StationDeck_Report_April_2026.pdf
+2026-06-17 09:29:44,632 - INFO -   ✅ DOCX → StationDeck_Report_April_2026.docx
+2026-06-17 09:29:44,632 - INFO -   ✅ XLSX → StationDeck_Report_April_2026.xlsx
+2026-06-17 09:29:44,633 - INFO - 
+[5/6] Archiving reports...
+2026-06-17 09:29:44,638 - INFO - Archived: StationDeck_Report_April_2026.pdf → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-17 09:29:44,642 - INFO - Archived: StationDeck_Report_April_2026.docx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-17 09:29:44,645 - INFO - Archived: StationDeck_Report_April_2026.xlsx → C:\Users\LENOVO\stationdeck\reports\te_rwizi\archive\2026-04
+2026-06-17 09:29:44,646 - INFO -   ✅ All files archived
+2026-06-17 09:29:44,646 - INFO - 
+[6/6] Sending email...
+2026-06-17 09:29:50,136 - INFO -   Email: Sent
+2026-06-17 09:29:50,137 - INFO - 
+=======================================================
+2026-06-17 09:29:50,139 - INFO -   ✅ Pipeline complete: April 2026
+2026-06-17 09:29:50,140 - INFO -   Station  : TotalEnergies Rwizi
+2026-06-17 09:29:50,141 - INFO -   Duration : 14.0 seconds
+2026-06-17 09:29:50,142 - INFO - =======================================================
+

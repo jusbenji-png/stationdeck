@@ -1,0 +1,691 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — StationDeck{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+
+    <!-- ── PAGE HEADER ──────────────────────────────────── -->
+    <div class="page-header">
+        <h1>{{ station_name }}</h1>
+        <p>{{ location }} &mdash; {{ current_month }} Overview</p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         UPDATE BANNER — hidden by default, shown by JS if
+         /check_update returns status = "update_available"
+    ═══════════════════════════════════════════════════════ -->
+    <div id="update-banner" style="display:none;
+        background:#fffbeb; border:1px solid #f59e0b; border-radius:8px;
+        padding:12px 16px; margin-bottom:20px;
+        display:none; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:1.1rem;">⬆</span>
+        <span id="update-banner-text" style="flex:1; font-size:0.9rem;
+            color:#92400e; font-weight:500;">
+            A new version of StationDeck is available.
+        </span>
+        <a id="update-banner-link" href="#" target="_blank"
+            style="background:#f59e0b; color:#fff; font-size:0.82rem;
+            font-weight:600; padding:6px 14px; border-radius:6px;
+            text-decoration:none; white-space:nowrap;">
+            Download Update
+        </a>
+        <button onclick="document.getElementById('update-banner').style.display='none';"
+            style="background:none; border:none; cursor:pointer; font-size:1.1rem;
+            color:#92400e; padding:0 4px; line-height:1;" title="Dismiss">
+            ✕
+        </button>
+    </div>
+
+    <!-- ── QUICK STAT CARDS ─────────────────────────────── -->
+    <div class="stats-grid">
+
+        <div class="stat-card dark">
+            <div class="stat-label">Total Records</div>
+            <div class="stat-value">{{ "{:,}".format(stats.total_records) }}</div>
+            <div class="stat-sub">
+                {{ stats.earliest_date or "—" }} → {{ stats.latest_date or "—" }}
+            </div>
+        </div>
+
+        <div class="stat-card blue">
+            <div class="stat-label">{{ current_month }} — Days Recorded</div>
+            <div class="stat-value">{{ stats.current_month_days }}</div>
+            <div class="stat-sub">Days with data this month</div>
+        </div>
+
+        <div class="stat-card red">
+            <div class="stat-label">{{ current_month }} — Fuel Revenue</div>
+            <div class="stat-value small">
+                UGX {{ "{:,.0f}".format(stats.current_month_fuel_rev) }}
+            </div>
+            <div class="stat-sub">PMS + AGO combined</div>
+        </div>
+
+        <div class="stat-card green">
+            <div class="stat-label">{{ current_month }} — Cash Delta</div>
+            <div class="stat-value small
+                {% if stats.current_month_delta >= 0 %}stat-positive{% else %}stat-negative{% endif %}">
+                {% if stats.current_month_delta >= 0 %}+{% endif %}
+                UGX {{ "{:,.0f}".format(stats.current_month_delta) }}
+            </div>
+            <div class="stat-sub">
+                {% if stats.current_month_delta >= 0 %}Surplus{% else %}Shortage{% endif %}
+                this month
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         IMPROVEMENT 1 — DAILY ENTRY REVIEW
+         Shows the most recent day's figures after upload,
+         with a flag if the delta looks abnormal.
+    ═══════════════════════════════════════════════════════ -->
+    {% if stats.latest_day %}
+    <div class="card daily-review-card {% if stats.latest_day_anomaly %}anomaly{% endif %}">
+        <div class="card-title">
+            <span class="dot {% if stats.latest_day_anomaly %}dot-orange{% endif %}"></span>
+            Latest Entry — {{ stats.latest_day }}
+            {% if stats.latest_day_anomaly %}
+            <span class="anomaly-badge">⚠ Anomaly Detected</span>
+            {% else %}
+            <span class="ok-badge">✓ Entry OK</span>
+            {% endif %}
+        </div>
+
+        <div class="daily-review-row">
+            <div class="daily-stat">
+                <div class="daily-stat-label">Delta</div>
+                <div class="daily-stat-value
+                    {% if stats.latest_day_delta >= 0 %}stat-positive{% else %}stat-negative{% endif %}">
+                    {% if stats.latest_day_delta >= 0 %}+{% endif %}
+                    UGX {{ "{:,.0f}".format(stats.latest_day_delta) }}
+                </div>
+            </div>
+
+            <div class="daily-stat">
+                <div class="daily-stat-label">Status</div>
+                <div class="daily-stat-value">
+                    {% if stats.latest_day_delta > 0 %}
+                        <span class="badge badge-green">SURPLUS</span>
+                    {% elif stats.latest_day_delta < 0 %}
+                        <span class="badge badge-red">DEFICIT</span>
+                    {% else %}
+                        <span class="badge badge-grey">BALANCED</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="daily-stat">
+                <div class="daily-stat-label">Month so far</div>
+                <div class="daily-stat-value">{{ stats.current_month_days }} days recorded</div>
+            </div>
+
+            <div class="daily-stat">
+                <div class="daily-stat-label">Action</div>
+                <div class="daily-stat-value">
+                    <a href="{{ url_for('upload') }}" class="btn btn-outline btn-sm">
+                        Update Data
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% if stats.latest_day_anomaly %}
+        <div class="anomaly-note">
+            The delta for {{ stats.latest_day }} is
+            <strong>UGX {{ "{:,.0f}".format(stats.latest_day_delta | abs) }}</strong>
+            — this is above the normal threshold of UGX 500,000.
+            If this is incorrect, open your Daily Cash Flow file, correct the entry,
+            and re-upload using the <strong>Upload Data</strong> button. StationDeck
+            will update the record automatically.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ══════════════════════════════════════════════════════
+         IMPROVEMENT 2 — FY OVERVIEW
+         Visual month-by-month status strip for current FY.
+         Loaded via JavaScript after page load.
+    ═══════════════════════════════════════════════════════ -->
+    <div class="card">
+        <div class="card-title">
+            <span class="dot"></span>
+            Financial Year Overview
+            <span id="fy-label-badge" style="margin-left:8px; font-size:0.75rem;
+                font-weight:500; background:#e8f0fe; color:#1a56a0;
+                padding:2px 8px; border-radius:12px;">Loading...</span>
+            <span style="margin-left:auto; font-size:0.78rem; color:var(--grey-text);">
+                Uganda FY: July – June
+            </span>
+        </div>
+
+        <div id="fy-overview-panel">
+            <!-- Skeleton loading state -->
+            <div class="fy-skeleton">
+                {% for i in range(12) %}
+                <div class="fy-month-skeleton"></div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="fy-legend">
+            <span class="fy-legend-item">
+                <span class="fy-dot fy-dot-green"></span> Data complete
+            </span>
+            <span class="fy-legend-item">
+                <span class="fy-dot fy-dot-red"></span> Data missing
+            </span>
+            <span class="fy-legend-item">
+                <span class="fy-dot fy-dot-grey"></span> Future month
+            </span>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         IMPROVEMENT 3 — MONTHLY PREVIEW BEFORE GENERATING
+         Manager selects month/year, clicks Preview, sees
+         aggregated figures before committing to generation.
+    ═══════════════════════════════════════════════════════ -->
+    <div class="card">
+        <div class="card-title">
+            <span class="dot"></span>
+            Generate Monthly Report
+        </div>
+
+        <div class="generate-panel">
+            <div class="form-group">
+                <label class="form-label">Month</label>
+                <select class="form-control" id="gen-month">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Year</label>
+                <select class="form-control" id="gen-year">
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-outline" id="preview-btn" onclick="previewMonth()">
+                    Preview Data
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-primary" id="gen-btn" onclick="generateMonthly()">
+                    Generate Report
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <a href="{{ url_for('upload') }}" class="btn btn-outline">
+                    Upload New Data
+                </a>
+            </div>
+        </div>
+
+        <!-- Preview panel — hidden until Preview Data is clicked -->
+        <div id="preview-panel" style="display:none;">
+            <div class="preview-divider">
+                <span>Data Summary — <span id="preview-period"></span></span>
+            </div>
+            <div class="preview-grid" id="preview-grid">
+                <!-- Filled by JS -->
+            </div>
+            <div id="preview-note" class="preview-note" style="display:none;"></div>
+        </div>
+
+        <div id="generate-status"></div>
+    </div>
+
+    <!-- ── GENERATE ANNUAL REPORT ───────────────────────── -->
+    <div class="card">
+        <div class="card-title">
+            <span class="dot"></span>
+            Generate Annual Report
+            <span style="margin-left:8px; font-size:0.75rem; font-weight:500;
+                         background:#e8f0fe; color:#1a56a0; padding:2px 8px;
+                         border-radius:12px;">Uganda FY: July – June</span>
+        </div>
+
+        {% if fy_options %}
+        <div class="generate-panel">
+            <div class="form-group">
+                <label class="form-label">Financial Year</label>
+                <select class="form-control" id="gen-fy" style="min-width:280px;">
+                    {% for fy in fy_options %}
+                    <option value="{{ fy.fy_start_year }}">{{ fy.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-dark" id="gen-annual-btn" onclick="generateAnnual()">
+                    Generate Annual Report
+                </button>
+            </div>
+        </div>
+
+        <p style="font-size:0.82rem; color:#6b7280; margin-top:8px; padding: 0 2px;">
+            Aggregates all 12 months of the selected financial year into one comprehensive
+            PDF, DOCX, and XLSX report. Months without data will be noted automatically.
+        </p>
+
+        {% else %}
+        <div class="empty-state" style="padding: 24px;">
+            <div class="empty-state-icon">📅</div>
+            <h3>No data available yet</h3>
+            <p>Upload your Daily Cash Flow data first to enable annual report generation.</p>
+        </div>
+        {% endif %}
+
+        <div id="generate-annual-status"></div>
+    </div>
+
+    <!-- ── RECENT REPORTS ───────────────────────────────── -->
+    <div class="card">
+        <div class="card-title">
+            <span class="dot"></span>
+            Recent Reports
+            <a href="{{ url_for('reports') }}"
+               style="margin-left:auto; font-size:0.82rem; font-weight:500; color:#6b7280;">
+                View all →
+            </a>
+        </div>
+
+        {% if report_files %}
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Report</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Generated</th>
+                    <th>Download</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in report_files[:9] %}
+                <tr>
+                    <td style="font-size:0.85rem; color:#374151;">{{ f.name }}</td>
+                    <td>
+                        {% if f.is_annual %}
+                        <span class="badge" style="background:#f3e8ff; color:#6b21a8;">Annual</span>
+                        {% else %}
+                        <span class="badge" style="background:#e8f0fe; color:#1a56a0;">Monthly</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-{{ f.type_lower }}">{{ f.type }}</span></td>
+                    <td style="color:#6b7280;">{{ f.size_kb }} KB</td>
+                    <td style="color:#6b7280;">{{ f.modified }}</td>
+                    <td>
+                        <a href="{{ url_for('download', report_type=f.type_lower, filename=f.name) }}"
+                           class="btn btn-outline btn-sm">
+                            Download
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <h3>No reports yet</h3>
+            <p>Use the Generate Report panels above to create your first report.</p>
+        </div>
+        {% endif %}
+
+    </div>
+
+</div><!-- end page-wrapper -->
+
+<!-- ── SCRIPTS ───────────────────────────────────────────── -->
+<script>
+
+// ── Set the month/year selectors to current month on load ──
+(function () {
+    const month = {{ current_month_num }};
+    const year  = {{ current_year }};
+
+    const mSel = document.getElementById('gen-month');
+    const ySel = document.getElementById('gen-year');
+
+    if (mSel) {
+        for (let i = 0; i < mSel.options.length; i++) {
+            if (parseInt(mSel.options[i].value) === month) {
+                mSel.selectedIndex = i;
+                break;
+            }
+        }
+    }
+    if (ySel) {
+        for (let i = 0; i < ySel.options.length; i++) {
+            if (parseInt(ySel.options[i].value) === year) {
+                ySel.selectedIndex = i;
+                break;
+            }
+        }
+    }
+})();
+
+// ── Helper: format UGX numbers ─────────────────────────────
+function ugx(val) {
+    if (val === null || val === undefined || isNaN(val)) return '—';
+    return 'UGX ' + Math.round(val).toLocaleString();
+}
+
+// ══════════════════════════════════════════════════════════
+// UPDATE BANNER — check on page load, show only if update
+// is available. Runs async so it never delays page render.
+// ══════════════════════════════════════════════════════════
+function checkForUpdate() {
+    fetch('/check_update')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.status !== 'update_available') return;
+
+            var banner = document.getElementById('update-banner');
+            var text   = document.getElementById('update-banner-text');
+            var link   = document.getElementById('update-banner-link');
+
+            // Build the message
+            var msg = 'StationDeck v' + data.latest_version + ' is available';
+            if (data.release_notes) {
+                msg += ' — ' + data.release_notes;
+            }
+            text.textContent = msg;
+
+            // Wire up the download button
+            if (data.download_url) {
+                link.href = data.download_url;
+            }
+
+            // Show the banner (was display:none)
+            banner.style.display = 'flex';
+        })
+        .catch(function() {
+            // Silently fail — never block the dashboard for an update check
+        });
+}
+
+// ══════════════════════════════════════════════════════════
+// FY OVERVIEW — load on page ready
+// ══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+    loadFyOverview();
+    checkForUpdate();   // runs after page is ready — non-blocking
+});
+
+function loadFyOverview() {
+    fetch('/fy_status')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('fy-overview-panel');
+            const badge = document.getElementById('fy-label-badge');
+            if (badge) badge.textContent = data.fy_label || '';
+
+            let html = '<div class="fy-grid">';
+
+            (data.months || []).forEach(function(m) {
+                let cls  = 'fy-month';
+                let icon = '';
+                let sub  = '';
+
+                if (m.is_future) {
+                    cls += ' fy-future';
+                    icon = '–';
+                    sub  = 'Not yet';
+                } else if (m.has_data) {
+                    cls += ' fy-ok';
+                    icon = '✓';
+                    sub  = m.days + ' days';
+                } else {
+                    cls += ' fy-missing';
+                    icon = '!';
+                    sub  = 'No data';
+                }
+
+                // Revenue bar — proportional fill (max ~1.4B UGX = 100%)
+                const maxRev   = 1_400_000_000;
+                const pct      = m.has_data ? Math.min(100, (m.fuel_revenue / maxRev) * 100) : 0;
+                const revLabel = m.has_data ? ugx(m.fuel_revenue) : '—';
+
+                // Delta colour
+                let deltaStr  = '—';
+                let deltaClass= '';
+                if (m.has_data) {
+                    const sign = m.delta >= 0 ? '+' : '';
+                    deltaStr   = sign + 'UGX ' + Math.abs(Math.round(m.delta)).toLocaleString();
+                    deltaClass = m.delta >= 0 ? 'fy-delta-pos' : 'fy-delta-neg';
+                }
+
+                html += `
+                <div class="${cls}" title="${m.label}: ${revLabel}">
+                    <div class="fy-month-label">${m.label}</div>
+                    <div class="fy-month-icon">${icon}</div>
+                    <div class="fy-bar-wrap">
+                        <div class="fy-bar" style="width:${pct}%"></div>
+                    </div>
+                    <div class="fy-month-rev">${revLabel}</div>
+                    <div class="fy-month-sub ${deltaClass}">${deltaStr}</div>
+                    <div class="fy-month-days">${sub}</div>
+                </div>`;
+            });
+
+            html += '</div>';
+            panel.innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('fy-overview-panel').innerHTML =
+                '<p style="color:var(--grey-text); padding:16px 0; font-size:0.88rem;">' +
+                'Could not load FY overview.</p>';
+        });
+}
+
+// ══════════════════════════════════════════════════════════
+// MONTHLY PREVIEW
+// ══════════════════════════════════════════════════════════
+function previewMonth() {
+    const month = document.getElementById('gen-month').value;
+    const year  = document.getElementById('gen-year').value;
+    const btn   = document.getElementById('preview-btn');
+    const panel = document.getElementById('preview-panel');
+
+    btn.disabled    = true;
+    btn.textContent = 'Loading...';
+
+    fetch(`/preview_month?month=${month}&year=${year}`)
+        .then(r => r.json())
+        .then(d => {
+            btn.disabled    = false;
+            btn.textContent = 'Preview Data';
+
+            panel.style.display = 'block';
+            document.getElementById('preview-period').textContent = d.period || '';
+
+            const note = document.getElementById('preview-note');
+
+            if (!d.has_data) {
+                document.getElementById('preview-grid').innerHTML =
+                    `<div class="preview-no-data">
+                        ⚠ ${d.message || 'No data found for this period.'}
+                        <a href="/upload" style="margin-left:8px; color:var(--red); font-weight:600;">
+                            Upload Data →
+                        </a>
+                    </div>`;
+                note.style.display = 'none';
+                return;
+            }
+
+            // Delta colour
+            const dClass = d.total_delta >= 0 ? 'preview-val-green' : 'preview-val-red';
+            const dSign  = d.total_delta >= 0 ? '+' : '';
+            const dLabel = d.delta_status;
+
+            document.getElementById('preview-grid').innerHTML = `
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Days Recorded</div>
+                    <div class="preview-stat-value">${d.days}</div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">PMS Volume</div>
+                    <div class="preview-stat-value">${d.pms_volume.toLocaleString(undefined,{maximumFractionDigits:1})} L</div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">AGO Volume</div>
+                    <div class="preview-stat-value">${d.ago_volume.toLocaleString(undefined,{maximumFractionDigits:1})} L</div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Fuel Revenue</div>
+                    <div class="preview-stat-value">${ugx(d.fuel_revenue)}</div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Total Sales</div>
+                    <div class="preview-stat-value">${ugx(d.total_sales)}</div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Cash Collected</div>
+                    <div class="preview-stat-value">${ugx(d.cash_collected)} <span class="preview-pct">${d.cash_pct}%</span></div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Cashless</div>
+                    <div class="preview-stat-value">${ugx(d.cashless_collected)} <span class="preview-pct">${d.cashless_pct}%</span></div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Net Delta</div>
+                    <div class="preview-stat-value ${dClass}">${dSign}${ugx(d.total_delta)} — ${dLabel}</div>
+                </div>
+                <div class="preview-stat">
+                    <div class="preview-stat-label">Anomaly Days</div>
+                    <div class="preview-stat-value ${d.anomaly_days > 0 ? 'preview-val-orange' : ''}">
+                        ${d.anomaly_days} / ${d.days}
+                    </div>
+                </div>
+            `;
+
+            // Helpful note below the grid
+            if (d.anomaly_days > 0) {
+                note.style.display = 'block';
+                note.innerHTML = `<strong>Note:</strong> ${d.anomaly_days} day(s) have a non-zero delta.
+                    This is normal if some days had cash variances. The report will include details.
+                    If figures look wrong, re-upload the corrected file before generating.`;
+            } else {
+                note.style.display = 'none';
+            }
+        })
+        .catch(function() {
+            btn.disabled    = false;
+            btn.textContent = 'Preview Data';
+            document.getElementById('preview-panel').style.display = 'block';
+            document.getElementById('preview-grid').innerHTML =
+                '<div class="preview-no-data">Could not load preview. Check StationDeck is running.</div>';
+        });
+}
+
+// ══════════════════════════════════════════════════════════
+// MONTHLY REPORT GENERATION
+// ══════════════════════════════════════════════════════════
+function generateMonthly() {
+    const month  = document.getElementById('gen-month').value;
+    const year   = document.getElementById('gen-year').value;
+    const btn    = document.getElementById('gen-btn');
+    const status = document.getElementById('generate-status');
+
+    btn.disabled    = true;
+    btn.textContent = 'Generating...';
+
+    status.className   = 'show running';
+    status.textContent = '⏳ Generating monthly report — this takes about 15–30 seconds...';
+
+    const formData = new FormData();
+    formData.append('month', month);
+    formData.append('year',  year);
+
+    fetch('/generate', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled    = false;
+            btn.textContent = 'Generate Report';
+            if (data.success) {
+                status.className   = 'show done';
+                status.textContent = '✅ ' + data.message + ' Refresh the page to see new files.';
+            } else {
+                status.className   = 'show fail';
+                status.textContent = '❌ ' + data.message;
+            }
+        })
+        .catch(function() {
+            btn.disabled    = false;
+            btn.textContent = 'Generate Report';
+            status.className   = 'show fail';
+            status.textContent = '❌ Network error. Check that StationDeck is running.';
+        });
+}
+
+// ══════════════════════════════════════════════════════════
+// ANNUAL REPORT GENERATION
+// ══════════════════════════════════════════════════════════
+function generateAnnual() {
+    const fySelect = document.getElementById('gen-fy');
+    if (!fySelect) return;
+
+    const fyStartYear = fySelect.value;
+    const fyLabel     = fySelect.options[fySelect.selectedIndex].text;
+    const btn         = document.getElementById('gen-annual-btn');
+    const status      = document.getElementById('generate-annual-status');
+
+    btn.disabled    = true;
+    btn.textContent = 'Generating...';
+
+    status.className   = 'show running';
+    status.textContent = '⏳ Generating annual report for ' + fyLabel + ' — this may take up to 60 seconds...';
+
+    const formData = new FormData();
+    formData.append('fy_start_year', fyStartYear);
+
+    fetch('/generate_annual', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled    = false;
+            btn.textContent = 'Generate Annual Report';
+            if (data.success) {
+                status.className   = 'show done';
+                status.textContent = '✅ ' + data.message + ' Refresh the page to see new files.';
+            } else {
+                status.className   = 'show fail';
+                status.textContent = '❌ ' + data.message;
+            }
+        })
+        .catch(function() {
+            btn.disabled    = false;
+            btn.textContent = 'Generate Annual Report';
+            status.className   = 'show fail';
+            status.textContent = '❌ Network error. Check that StationDeck is running.';
+        });
+}
+</script>
+
+{% endblock %}
