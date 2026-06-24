@@ -24,11 +24,14 @@ from cryptography.fernet import Fernet
 
 if getattr(sys, 'frozen', False):
     BASE_DIR = Path(sys.executable).parent
+    # Program Files is read-only for normal users; write license.key to APPDATA instead
+    _appdata  = Path(os.environ.get("APPDATA", BASE_DIR))
+    CONFIG_DIR = _appdata / "StationDeck"
 else:
-    BASE_DIR = Path(__file__).resolve().parent.parent
+    BASE_DIR   = Path(__file__).resolve().parent.parent
+    CONFIG_DIR = BASE_DIR / "config"
 
-CONFIG_DIR = BASE_DIR / "config"
-KEY_FILE   = CONFIG_DIR / "license.key"   # encrypted payload stored here
+KEY_FILE = CONFIG_DIR / "license.key"
 
 
 # ------------------------------------------------------------------------------
