@@ -12,6 +12,8 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
+SetupIconFile=C:\Users\LENOVO\stationdeck\web\static\favicon.ico
+UninstallDisplayIcon={app}\StationDeck.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
