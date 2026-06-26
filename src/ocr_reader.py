@@ -78,16 +78,33 @@ except ImportError:
     OCR_AVAILABLE = False
     logger.warning("pytesseract or Pillow not available — OCR disabled.")
 
-# ── OpenAI client ─────────────────────────────────────────────
+# ── OCR backend ───────────────────────────────────────────────
+# Primary path: route the vision call through the StationDeck server so the
+# OpenAI key lives ONLY on the server. Stations never need their own key.
+# Fallback path: if no station credentials are supplied (e.g. local dev /
+# test_ocr.py) and a local OPENAI_API_KEY exists, call OpenAI directly.
+OCR_SERVER_URL = "https://web-production-46077.up.railway.app/ocr"
+
+try:
+    import requests
+    _REQUESTS_OK = True
+except ImportError:
+    _REQUESTS_OK = False
+
 try:
     from openai import OpenAI
     from config.settings import OPENAI_API_KEY, OPENAI_MODEL
     _openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-    VISION_AVAILABLE = _openai_client is not None
 except Exception as e:
     _openai_client = None
-    VISION_AVAILABLE = False
-    logger.warning(f"OpenAI client not available: {e}")
+    logger.warning(f"Local OpenAI client not available (will use server OCR): {e}")
+
+# Vision works if we can reach the server (requests) OR call OpenAI locally.
+VISION_AVAILABLE = _REQUESTS_OK or (_openai_client is not None)
+
+# Station credentials for server-side OCR — set per call by read_capture_sheets().
+_OCR_STATION_NAME = None
+_OCR_MACHINE_ID   = None
 
 
 # =============================================================
@@ -251,11 +268,18 @@ def _box_count(fid: str) -> int:
 # PUBLIC ENTRY POINT
 # =============================================================
 
-def read_capture_sheets(photo_paths: list, entry_date: str, shift: str) -> dict:
+def read_capture_sheets(photo_paths: list, entry_date: str, shift: str,
+                        station_name: str = None, machine_id: str = None) -> dict:
+    # Store station credentials so _call_vision_api can route through the
+    # StationDeck server (server holds the OpenAI key).
+    global _OCR_STATION_NAME, _OCR_MACHINE_ID
+    _OCR_STATION_NAME = station_name
+    _OCR_MACHINE_ID   = machine_id
+
     if not OCR_AVAILABLE:
         return _all_unread("pytesseract or Pillow is not installed on this machine.")
     if not VISION_AVAILABLE:
-        return _all_unread("OpenAI API key not configured — cannot read digits.")
+        return _all_unread("OCR backend unavailable — cannot read digits.")
 
     def _is_meaningful(v):
         """True when v carries a confirmed non-zero digit reading."""
@@ -576,12 +600,35 @@ def _read_sheet_with_vision(path: Path, coord_map: dict, sheet_label: str) -> di
 
 
 # =============================================================
-# OPENAI VISION API CALL
+# VISION API CALL  —  server-routed, with local fallback
 # =============================================================
 
 def _call_vision_api(image_b64: str, prompt: str):
+    # ── Primary: route through the StationDeck server (key stays server-side) ──
+    if _OCR_STATION_NAME and _OCR_MACHINE_ID and _REQUESTS_OK:
+        try:
+            resp = requests.post(
+                OCR_SERVER_URL,
+                json={
+                    "station_name": _OCR_STATION_NAME,
+                    "machine_id":   _OCR_MACHINE_ID,
+                    "image_b64":    image_b64,
+                    "prompt":       prompt,
+                },
+                timeout=60,
+            )
+            data = resp.json()
+            if data.get("success"):
+                return data.get("text")
+            logger.error(f"Server OCR failed ({resp.status_code}): {data.get('message')}")
+            return None
+        except Exception as e:
+            logger.error(f"Server OCR request failed: {e}")
+            return None
+
+    # ── Fallback: local OpenAI key (dev / test_ocr.py only) ──
     if _openai_client is None:
-        logger.error("OpenAI client not initialised.")
+        logger.error("No OCR backend: no station credentials and no local OpenAI key.")
         return None
     try:
         response = _openai_client.chat.completions.create(

@@ -12,6 +12,8 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
+; Install into 64-bit Program Files (not the x86 folder)
+ArchitecturesInstallIn64BitMode=x64
 SetupIconFile=C:\Users\LENOVO\stationdeck\web\static\favicon.ico
 UninstallDisplayIcon={app}\StationDeck.exe
 

@@ -654,7 +654,13 @@ def daily_entry_import_photos():
 
     try:
         from src.ocr_reader import read_capture_sheets
-        fields = read_capture_sheets(saved_paths, entry_date, shift)
+        # Pass station credentials so OCR routes through the StationDeck server
+        # (the server holds the OpenAI key — no key needed on the install).
+        fields = read_capture_sheets(
+            saved_paths, entry_date, shift,
+            station_name=session.get("station_name"),
+            machine_id=get_machine_id(STATION_ID),
+        )
         return jsonify({"success": True, "fields": fields})
     except Exception as e:
         logger.error(f"OCR failed: {e}", exc_info=True)
