@@ -85,8 +85,10 @@ def _get_local_ip() -> str:
 # ── Startup log ───────────────────────────────────────────────────────────────
 
 def _get_log_path() -> Path:
+    # Logs are writable → %LOCALAPPDATA%\StationDeck when frozen (not Program Files).
     if getattr(sys, 'frozen', False):
-        base = Path(sys.executable).parent
+        appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        base = Path(appdata) / "StationDeck" if appdata else Path(sys.executable).parent
     else:
         base = Path(__file__).parent
     log_dir = base / "logs"
@@ -113,22 +115,23 @@ def _log(msg: str):
 def _ensure_dirs():
     """Create all essential directories before Flask starts."""
     try:
-        from config.settings import BASE_DIR
+        # All writable dirs live under DATA_DIR (%LOCALAPPDATA%\StationDeck when
+        # frozen). Station YAML is read-only and ships in the install dir.
+        from config.settings import DATA_DIR
         dirs = [
-            BASE_DIR / "data" / "input",
-            BASE_DIR / "data" / "processed",
-            BASE_DIR / "data" / "ocr_temp",
-            BASE_DIR / "data" / "ocr_audit",
-            BASE_DIR / "logs",
-            BASE_DIR / "reports" / "te_rwizi" / "pdf",
-            BASE_DIR / "reports" / "te_rwizi" / "docx",
-            BASE_DIR / "reports" / "te_rwizi" / "xlsx",
-            BASE_DIR / "reports" / "te_rwizi" / "archive",
-            BASE_DIR / "config" / "stations",
+            DATA_DIR / "data" / "input",
+            DATA_DIR / "data" / "processed",
+            DATA_DIR / "data" / "ocr_temp",
+            DATA_DIR / "data" / "ocr_audit",
+            DATA_DIR / "logs",
+            DATA_DIR / "reports" / "te_rwizi" / "pdf",
+            DATA_DIR / "reports" / "te_rwizi" / "docx",
+            DATA_DIR / "reports" / "te_rwizi" / "xlsx",
+            DATA_DIR / "reports" / "te_rwizi" / "archive",
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
-        _log("Directories verified.")
+        _log(f"Directories verified under: {DATA_DIR}")
     except Exception as e:
         _log(f"WARNING: _ensure_dirs() failed: {e}")
 

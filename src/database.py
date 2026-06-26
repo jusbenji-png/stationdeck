@@ -15,7 +15,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).parent.parent / "data" / "stationdeck.db"
+# Writable DB location — under %LOCALAPPDATA%\StationDeck when frozen so it is
+# writable by non-admin users and survives app updates.
+try:
+    from config.settings import DATA_DIR
+    DB_PATH = DATA_DIR / "data" / "stationdeck.db"
+except Exception:
+    DB_PATH = Path(__file__).parent.parent / "data" / "stationdeck.db"
 
 DAILY_COLUMNS = [
     "date", "pms_volume", "ago_volume", "pms_price", "ago_price",

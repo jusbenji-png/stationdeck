@@ -57,6 +57,10 @@ else:
 # ── Make sure src/ is importable ─────────────────────────────────────────────
 sys.path.insert(0, str(ROOT))
 
+# Writable data root — under %LOCALAPPDATA%\StationDeck when frozen so non-admin
+# users can write and data survives updates. ROOT stays read-only (install dir).
+from config.settings import DATA_DIR as DATA_ROOT
+
 from src.database import (
     init_db,
     import_from_excel,
@@ -637,7 +641,7 @@ def daily_entry_import_photos():
     if not photos or all(p.filename == "" for p in photos):
         return jsonify({"success": False, "message": "No photos received."})
 
-    temp_dir = ROOT / "data" / "ocr_temp"
+    temp_dir = DATA_ROOT / "data" / "ocr_temp"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     saved_paths = []
@@ -687,7 +691,7 @@ def daily_entry_import_excel():
     if not files or all(f.filename == "" for f in files):
         return jsonify({"success": False, "message": "No files received."})
 
-    input_dir = ROOT / "data" / "input"
+    input_dir = DATA_ROOT / "data" / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
 
     total_imported = 0
@@ -769,7 +773,7 @@ def daily_entry_commit():
         )
 
         if result.get("success"):
-            audit_dir  = ROOT / "data" / "ocr_audit"
+            audit_dir  = DATA_ROOT / "data" / "ocr_audit"
             audit_dir.mkdir(parents=True, exist_ok=True)
             audit_file = audit_dir / f"{entry_date}_{shift}_{entry_mode}.json"
             with open(str(audit_file), "w", encoding="utf-8") as f:
@@ -818,7 +822,7 @@ def upload():
             flash("Only Excel files (.xlsx or .xls) are accepted.", "error")
             return redirect(url_for("upload"))
 
-        input_dir = ROOT / "data" / "input"
+        input_dir = DATA_ROOT / "data" / "input"
         input_dir.mkdir(parents=True, exist_ok=True)
         save_path = input_dir / "Daily_cash_flow.xlsx"
         file.save(str(save_path))
@@ -1088,7 +1092,7 @@ def settings():
 
     machine_id  = get_machine_id(STATION_ID)
     lic         = _license_context()
-    data_path   = str(ROOT / "data")
+    data_path   = str(DATA_ROOT / "data")
     local_ip    = _get_local_ip()
     network_url = f"http://{local_ip}:5000" if local_ip != "unknown" else None
 

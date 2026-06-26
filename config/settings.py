@@ -20,30 +20,36 @@ from dotenv import load_dotenv
 # Frozen .exe:   BASE_DIR = dist/StationDeck/     (exe folder)
 
 if getattr(sys, 'frozen', False):
-    # Running as compiled .exe — use the folder containing the .exe
+    # Running as compiled .exe — BASE_DIR is the (read-only) install folder.
     BASE_DIR = Path(sys.executable).parent
+    # Writable data MUST NOT live under Program Files (non-admin users cannot
+    # write there) and must survive app updates. Use %LOCALAPPDATA%\StationDeck.
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    DATA_DIR = (Path(_appdata) / "StationDeck") if _appdata else BASE_DIR
 else:
     # Running in development — settings.py is at config/settings.py
-    # so parent.parent = project root
+    # so parent.parent = project root. Data stays in the project root.
     BASE_DIR = Path(__file__).parent.parent
+    DATA_DIR = BASE_DIR
 
-# Load secret keys from .env file (must come after BASE_DIR is set)
+# Load secret keys from .env file (read-only — lives next to the install/dev root)
 load_dotenv(BASE_DIR / ".env")
 
 # =============================================================
 # PROJECT PATHS
 # =============================================================
-DATA_INPUT_DIR      = BASE_DIR / "data" / "input"
-DATA_PROCESSED_DIR  = BASE_DIR / "data" / "processed"
-DATA_ARCHIVE_DIR    = BASE_DIR / "data" / "archive"
-REPORTS_PDF_DIR     = BASE_DIR / "reports" / "pdf"
-REPORTS_DOCX_DIR    = BASE_DIR / "reports" / "docx"
-REPORTS_HISTORY_DIR = BASE_DIR / "reports" / "history"
-LOGS_DIR            = BASE_DIR / "logs"
-TEMPLATES_DIR       = BASE_DIR / "templates"
+# WRITABLE locations live under DATA_DIR; read-only bundled assets under BASE_DIR.
+DATA_INPUT_DIR      = DATA_DIR / "data" / "input"
+DATA_PROCESSED_DIR  = DATA_DIR / "data" / "processed"
+DATA_ARCHIVE_DIR    = DATA_DIR / "data" / "archive"
+REPORTS_PDF_DIR     = DATA_DIR / "reports" / "pdf"
+REPORTS_DOCX_DIR    = DATA_DIR / "reports" / "docx"
+REPORTS_HISTORY_DIR = DATA_DIR / "reports" / "history"
+LOGS_DIR            = DATA_DIR / "logs"
+TEMPLATES_DIR       = BASE_DIR / "templates"   # read-only bundled assets
 
 # Shorthand aliases used by processor.py and main.py
-REPORTS_DIR         = BASE_DIR / "reports"
+REPORTS_DIR         = DATA_DIR / "reports"
 ARCHIVE_DIR         = REPORTS_DIR / "archive"
 
 # =============================================================

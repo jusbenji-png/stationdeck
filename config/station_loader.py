@@ -3,19 +3,25 @@
 # StationDeck — Station Configuration Loader
 # ============================================================
 
+import os
 import sys
 import yaml
 from pathlib import Path
 
 # --- Path detection: works both frozen (.exe) and in development ---
 if getattr(sys, 'frozen', False):
-    PROJECT_ROOT = Path(sys.executable).parent
+    PROJECT_ROOT = Path(sys.executable).parent          # read-only install dir
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    DATA_ROOT = (Path(_appdata) / "StationDeck") if _appdata else PROJECT_ROOT
 else:
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    DATA_ROOT = PROJECT_ROOT
 
+# Station YAML is a read-only bundled asset → install dir.
 STATIONS_DIR = PROJECT_ROOT / "config" / "stations"
-DATA_INPUT_DIR = PROJECT_ROOT / "data" / "input"
-REPORTS_DIR = PROJECT_ROOT / "reports"
+# Input data and report output are WRITABLE → DATA_ROOT (%LOCALAPPDATA% when frozen).
+DATA_INPUT_DIR = DATA_ROOT / "data" / "input"
+REPORTS_DIR = DATA_ROOT / "reports"
 
 
 def load_station_config(station_id: str) -> dict:
