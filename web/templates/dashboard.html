@@ -263,13 +263,32 @@
         <div class="card-title">
             <span class="dot"></span>
             Generate Annual Report
-            <span style="margin-left:8px; font-size:0.75rem; font-weight:500;
-                         background:#e8f0fe; color:#1a56a0; padding:2px 8px;
-                         border-radius:12px;">Uganda FY: July – June</span>
         </div>
 
         {% if fy_options %}
-        <div class="generate-panel">
+
+        <!-- Mode toggle -->
+        <div style="display:flex; gap:0; margin-bottom:18px;
+                    border:1.5px solid #d1d5db; border-radius:8px; overflow:hidden;
+                    width:fit-content;">
+            <button id="ann-mode-fy"
+                    onclick="setAnnualMode('fy')"
+                    style="padding:8px 20px; border:none; cursor:pointer; font-size:13px;
+                           font-weight:700; font-family:inherit;
+                           background:#1f2937; color:#fff;">
+                Financial Year (Jul – Jun)
+            </button>
+            <button id="ann-mode-last12"
+                    onclick="setAnnualMode('last12')"
+                    style="padding:8px 20px; border:none; cursor:pointer; font-size:13px;
+                           font-weight:700; font-family:inherit;
+                           background:#f9fafb; color:#6b7280;">
+                Last 12 Months of Data
+            </button>
+        </div>
+
+        <!-- FY selector — shown only in "fy" mode -->
+        <div id="ann-fy-row" class="generate-panel">
             <div class="form-group">
                 <label class="form-label">Financial Year</label>
                 <select class="form-control" id="gen-fy" style="min-width:280px;">
@@ -278,7 +297,6 @@
                     {% endfor %}
                 </select>
             </div>
-
             <div class="form-group">
                 <label class="form-label">&nbsp;</label>
                 <button class="btn btn-dark" id="gen-annual-btn" onclick="generateAnnual()">
@@ -287,9 +305,31 @@
             </div>
         </div>
 
-        <p style="font-size:0.82rem; color:#6b7280; margin-top:8px; padding: 0 2px;">
-            Aggregates all 12 months of the selected financial year into one comprehensive
-            PDF, DOCX, and XLSX report. Months without data will be noted automatically.
+        <!-- Last-12 row — shown only in "last12" mode -->
+        <div id="ann-last12-row" class="generate-panel" style="display:none;">
+            <div class="form-group">
+                <label class="form-label">Period</label>
+                <div style="font-size:13px; color:#374151; padding:8px 0; font-weight:600;">
+                    Most recent 12 months in your uploaded data
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-dark" id="gen-annual-btn-l12" onclick="generateAnnual()">
+                    Generate Annual Report
+                </button>
+            </div>
+        </div>
+
+        <p id="ann-hint-fy"
+           style="font-size:0.82rem; color:#6b7280; margin-top:8px; padding:0 2px;">
+            Aggregates all 12 months of the selected Uganda financial year (July–June)
+            into one PDF, DOCX, and XLSX report. Months without data are noted automatically.
+        </p>
+        <p id="ann-hint-last12"
+           style="font-size:0.82rem; color:#6b7280; margin-top:8px; padding:0 2px; display:none;">
+            Automatically detects the 12 most recent calendar months present in your uploaded
+            data. Useful when your data doesn't align with the July–June financial year.
         </p>
 
         {% else %}
@@ -646,25 +686,51 @@ function generateMonthly() {
 }
 
 // ══════════════════════════════════════════════════════════
+// ANNUAL REPORT — MODE TOGGLE
+// ══════════════════════════════════════════════════════════
+var _annualMode = 'fy';
+
+function setAnnualMode(mode) {
+    _annualMode = mode;
+    var isFy = (mode === 'fy');
+
+    document.getElementById('ann-mode-fy').style.background     = isFy ? '#1f2937' : '#f9fafb';
+    document.getElementById('ann-mode-fy').style.color          = isFy ? '#fff'    : '#6b7280';
+    document.getElementById('ann-mode-last12').style.background = isFy ? '#f9fafb' : '#1f2937';
+    document.getElementById('ann-mode-last12').style.color      = isFy ? '#6b7280' : '#fff';
+
+    document.getElementById('ann-fy-row').style.display    = isFy ? ''     : 'none';
+    document.getElementById('ann-last12-row').style.display= isFy ? 'none' : '';
+    document.getElementById('ann-hint-fy').style.display   = isFy ? ''     : 'none';
+    document.getElementById('ann-hint-last12').style.display= isFy ? 'none': '';
+}
+
+// ══════════════════════════════════════════════════════════
 // ANNUAL REPORT GENERATION
 // ══════════════════════════════════════════════════════════
 function generateAnnual() {
-    const fySelect = document.getElementById('gen-fy');
-    if (!fySelect) return;
+    const status = document.getElementById('generate-annual-status');
+    const formData = new FormData();
+    var periodDesc, btn;
 
-    const fyStartYear = fySelect.value;
-    const fyLabel     = fySelect.options[fySelect.selectedIndex].text;
-    const btn         = document.getElementById('gen-annual-btn');
-    const status      = document.getElementById('generate-annual-status');
+    formData.append('report_mode', _annualMode);
+
+    if (_annualMode === 'last12') {
+        btn        = document.getElementById('gen-annual-btn-l12');
+        periodDesc = 'last 12 months of data';
+    } else {
+        const fySelect = document.getElementById('gen-fy');
+        if (!fySelect) return;
+        formData.append('fy_start_year', fySelect.value);
+        periodDesc = fySelect.options[fySelect.selectedIndex].text;
+        btn        = document.getElementById('gen-annual-btn');
+    }
 
     btn.disabled    = true;
     btn.textContent = 'Generating...';
 
     status.className   = 'show running';
-    status.textContent = '⏳ Generating annual report for ' + fyLabel + ' — this may take up to 60 seconds...';
-
-    const formData = new FormData();
-    formData.append('fy_start_year', fyStartYear);
+    status.textContent = '⏳ Generating annual report for ' + periodDesc + ' — this may take up to 60 seconds...';
 
     fetch('/generate_annual', { method: 'POST', body: formData })
         .then(r => r.json())

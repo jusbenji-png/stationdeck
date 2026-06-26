@@ -559,6 +559,258 @@ def process_annual_report(fy_start_year: int, station_config: dict) -> dict:
 
 
 # ============================================================
+# LAST-12-MONTHS REPORT PROCESSOR
+# Period: the 12 calendar months ending on the latest month
+# that has data in the cashflow file.
+# ============================================================
+
+def process_last12_months_report(station_config: dict) -> dict:
+    """
+    Processes the 12 most recent calendar months for which the cashflow
+    file contains at least one record.
+
+    Unlike process_annual_report(), this is not tied to July–June.
+    The period label is derived automatically (e.g. "Jul 2025 – Jun 2026").
+
+    Returns the same metrics dict shape as process_annual_report().
+    """
+    files         = station_config["files"]
+    CASHFLOW_FILE = files["cashflow"]
+    STOCK_FILE    = files["stock"]
+
+    # ── Detect the 12 months to cover ──────────────────────────
+    try:
+        df_all = read_daily_cashflow(CASHFLOW_FILE)
+        df_all["date"] = pd.to_datetime(df_all["date"], errors="coerce")
+        df_all = df_all.dropna(subset=["date"])
+        if df_all.empty:
+            raise ValueError("No data in cashflow file.")
+
+        latest_date  = df_all["date"].max()
+        end_month    = int(latest_date.month)
+        end_year     = int(latest_date.year)
+
+        # Build 12 months ending on (end_month, end_year)
+        target_months = []
+        for i in range(11, -1, -1):
+            m = end_month - i
+            y = end_year
+            while m < 1:
+                m += 12
+                y -= 1
+            target_months.append((m, y))
+
+        start_m, start_y = target_months[0]
+        period_label = (
+            f"{pd.Timestamp(year=start_y, month=start_m, day=1).strftime('%b %Y')}"
+            f" – "
+            f"{pd.Timestamp(year=end_year, month=end_month, day=1).strftime('%b %Y')}"
+        )
+        fy_label = f"Last 12 Months ({period_label})"
+
+    except Exception as e:
+        raise RuntimeError(f"Could not determine date range from cashflow file: {e}")
+
+    print(f"\n{'='*55}")
+    print(f"  Processing: Last 12 Months")
+    print(f"  Period:     {period_label}")
+    print(f"  Station:    {station_config['station_name']}")
+    print(f"{'='*55}")
+
+    metrics = {}
+
+    annual_cashflow = {
+        "pms_volume_total":      0,
+        "ago_volume_total":      0,
+        "pms_revenue_total":     0,
+        "ago_revenue_total":     0,
+        "total_fuel_revenue":    0,
+        "total_sales":           0,
+        "cash_collected":        0,
+        "cashless_collected":    0,
+        "plus_card_total":       0,
+        "visa_total":            0,
+        "credit_sales_total":    0,
+        "total_cash_banked":     0,
+        "total_delta":           0,
+        "total_days":            0,
+    }
+
+    monthly_cashflow_breakdown = []
+    months_with_data = 0
+
+    print("\n[1/2] Aggregating Daily Cash Flow across last 12 months...")
+    try:
+        for (month, year) in target_months:
+            mask     = (df_all["date"].dt.month == month) & (df_all["date"].dt.year == year)
+            df_month = df_all[mask].copy()
+
+            if df_month.empty:
+                monthly_cashflow_breakdown.append({
+                    "month": month, "year": year,
+                    "label": pd.Timestamp(year=year, month=month, day=1).strftime("%b %Y"),
+                    "data_available": False,
+                })
+                continue
+
+            months_with_data += 1
+            total_sales_m = df_month["cashless_total"].sum()
+            cash_m        = df_month["total_cash"].sum()
+            cashless_m    = total_sales_m - cash_m
+            fuel_rev_m    = df_month["pms_revenue"].sum() + df_month["ago_revenue"].sum()
+
+            monthly_cashflow_breakdown.append({
+                "month":          month,
+                "year":           year,
+                "label":          pd.Timestamp(year=year, month=month, day=1).strftime("%b %Y"),
+                "data_available": True,
+                "days":           len(df_month),
+                "pms_volume":     df_month["pms_volume"].sum(),
+                "ago_volume":     df_month["ago_volume"].sum(),
+                "fuel_revenue":   fuel_rev_m,
+                "total_sales":    total_sales_m,
+                "cash":           cash_m,
+                "cashless":       cashless_m,
+                "expenses":       0,
+                "delta":          df_month["delta"].sum(),
+            })
+
+            annual_cashflow["pms_volume_total"]   += df_month["pms_volume"].sum()
+            annual_cashflow["ago_volume_total"]   += df_month["ago_volume"].sum()
+            annual_cashflow["pms_revenue_total"]  += df_month["pms_revenue"].sum()
+            annual_cashflow["ago_revenue_total"]  += df_month["ago_revenue"].sum()
+            annual_cashflow["total_fuel_revenue"] += fuel_rev_m
+            annual_cashflow["total_sales"]        += total_sales_m
+            annual_cashflow["cash_collected"]     += cash_m
+            annual_cashflow["cashless_collected"] += cashless_m
+            annual_cashflow["plus_card_total"]    += df_month["plus_card_payment_total"].sum()
+            annual_cashflow["visa_total"]         += df_month["visa"].sum()
+            annual_cashflow["credit_sales_total"] += df_month["credit_sales"].sum()
+            annual_cashflow["total_cash_banked"]  += df_month["cash_to_bank"].sum()
+            annual_cashflow["total_delta"]        += df_month["delta"].sum()
+            annual_cashflow["total_days"]         += len(df_month)
+
+        ts = annual_cashflow["total_sales"]
+        annual_cashflow["cash_percentage"]     = round(annual_cashflow["cash_collected"] / ts * 100, 1) if ts > 0 else 0
+        annual_cashflow["cashless_percentage"] = round(annual_cashflow["cashless_collected"] / ts * 100, 1) if ts > 0 else 0
+
+        td = annual_cashflow["total_delta"]
+        annual_cashflow["delta_status"]              = "SURPLUS" if td > 0 else ("DEFICIT" if td < 0 else "BALANCED")
+        annual_cashflow["avg_monthly_fuel_revenue"]  = (
+            annual_cashflow["total_fuel_revenue"] / months_with_data if months_with_data > 0 else 0
+        )
+        annual_cashflow["months_with_data"] = months_with_data
+
+        metrics.update(annual_cashflow)
+        print(f"  Cashflow aggregated — {months_with_data}/12 months with data")
+
+    except Exception as e:
+        print(f"  Annual cashflow aggregation failed: {e}")
+
+    # ── Step 2: Stock data — cover all 12 months ────────────────
+    # get_annual_stock_metrics expects a fy_start_year (July–June).
+    # For last-12-months we call it for each relevant FY year that
+    # overlaps with our window, then filter by the target months.
+    print("\n[2/2] Aggregating Stock Movement across last 12 months...")
+    try:
+        # Collect unique (month, year) pairs that have cashflow data
+        stock_exp_by_label = {}
+        stock_data_available = False
+        lubes_total = lpg_total = shop_total = tba_total = lpg_acc_total = car_wash_total = 0
+
+        fy_years_needed = set()
+        for (month, year) in target_months:
+            # A month belongs to FY starting in (year-1) if month <= 6
+            fy_years_needed.add(year - 1 if month <= 6 else year)
+
+        for fy_yr in fy_years_needed:
+            try:
+                stock_annual = get_annual_stock_metrics(STOCK_FILE, fy_yr)
+                for row in stock_annual.get("monthly_breakdown", []):
+                    if row.get("data_available"):
+                        stock_exp_by_label[row["label"]] = row.get("total_expenses", 0)
+                        stock_data_available = True
+
+                ps = stock_annual.get("product_sales", {})
+                if ps.get("total_ugx", 0) > 0:
+                    lubes_total   += ps.get("lubricants_ugx", 0)
+                    lpg_total     += ps.get("lpg_ugx", 0)
+                    shop_total    += ps.get("shop_ugx", 0)
+                    tba_total     += ps.get("tba_ugx", 0)
+                    lpg_acc_total += ps.get("lpg_accessories_ugx", 0)
+                    car_wash_total+= ps.get("car_wash_ugx", 0)
+            except Exception:
+                pass
+
+        # Merge expenses into monthly breakdown
+        for row in monthly_cashflow_breakdown:
+            if row["label"] in stock_exp_by_label:
+                row["expenses"] = stock_exp_by_label[row["label"]]
+
+        total_expenses = sum(stock_exp_by_label.get(r["label"], 0) for r in monthly_cashflow_breakdown)
+
+        metrics["stock_data_available"]  = stock_data_available
+        metrics["expenses_detail_stock"] = {}
+        metrics["total_expenses"]        = total_expenses
+        metrics["total_expenses_stock"]  = total_expenses
+        metrics["lubes_revenue_total"]   = lubes_total
+        metrics["lpg_revenue_total"]     = lpg_total
+        metrics["shop_sales_total"]      = shop_total
+        metrics["tba_revenue_total"]     = tba_total
+        metrics["lpg_accessories_total"] = lpg_acc_total
+        metrics["car_wash_total"]        = car_wash_total
+        metrics["total_nonfuel_revenue"] = (
+            lubes_total + lpg_total + shop_total + tba_total + lpg_acc_total + car_wash_total
+        )
+        metrics["total_revenue"] = (
+            metrics.get("total_fuel_revenue", 0) + metrics["total_nonfuel_revenue"]
+        )
+        metrics["product_sales"] = {
+            "lubricants_ugx":      lubes_total,
+            "lpg_ugx":             lpg_total,
+            "shop_ugx":            shop_total,
+            "tba_ugx":             tba_total,
+            "lpg_accessories_ugx": lpg_acc_total,
+            "car_wash_ugx":        car_wash_total,
+            "total_ugx":           metrics["total_nonfuel_revenue"],
+        }
+        print(f"  Stock aggregated across {len(fy_years_needed)} FY period(s)")
+
+    except Exception as e:
+        print(f"  Stock aggregation failed (non-fatal): {e}")
+        metrics["stock_data_available"]  = False
+        metrics["expenses_detail_stock"] = {}
+        metrics["total_expenses"]        = 0
+        metrics["total_nonfuel_revenue"] = 0
+        metrics["total_revenue"]         = metrics.get("total_fuel_revenue", 0)
+
+    metrics["monthly_breakdown"] = monthly_cashflow_breakdown
+
+    metrics.update({
+        "report_type":   "annual",
+        "fy_start_year": None,
+        "fy_label":      fy_label,
+        "period_label":  period_label,
+        "station_id":    station_config["station_id"],
+        "station_name":  station_config["station_name"],
+        "location":      station_config.get("location", ""),
+        "currency":      station_config.get("currency", "UGX"),
+        "generated_at":  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "daily_df":      pd.DataFrame(),
+        "general_sales_daily": [],
+    })
+
+    print(f"\n{'='*55}")
+    print(f"  Last-12-months processing complete")
+    print(f"  Period:             {period_label}")
+    print(f"  Total fuel revenue: UGX {metrics.get('total_fuel_revenue', 0):,.0f}")
+    print(f"  Total expenses:     UGX {metrics.get('total_expenses', 0):,.0f}")
+    print(f"{'='*55}\n")
+
+    return metrics
+
+
+# ============================================================
 # BUILT-IN TEST
 # Run with: python -m src.processor
 # ============================================================

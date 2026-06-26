@@ -227,15 +227,30 @@ def main():
 
     # ── Start update check in background ─────────────────────────────────────
     # We do this AFTER Flask is confirmed ready so it never delays startup.
-    # The check runs silently — if the server is unreachable, nothing happens.
-    # Result is stored in src/updater.py and read by the /check_update route.
-    try:
-        from src.updater import start_update_check
-        start_update_check()
-        _log("Update check started in background.")
-    except Exception as e:
-        _log(f"WARNING: Could not start update checker: {e}")
-        # Not fatal — app runs fine without update checking
+    #
+    # WHY WE WAIT 5 SECONDS before starting the check:
+    # The browser opens immediately when Flask is ready. If we start the
+    # update check at exactly the same moment, the dashboard loads and calls
+    # /check_update before the background thread has had time to contact
+    # Railway (which takes 2-5 seconds on a typical connection). The result
+    # is "pending" and the banner never shows.
+    #
+    # By delaying 5 seconds, the update check completes BEFORE the user
+    # has finished logging in, so /check_update returns the real result
+    # the first time the dashboard loads.
+    #
+    # The dashboard JS also retries /check_update once after 8 seconds
+    # as a safety net for slow connections.
+    def _delayed_update_check():
+        time.sleep(5)
+        try:
+            from src.updater import start_update_check
+            start_update_check()
+            _log("Update check started in background (after 5s delay).")
+        except Exception as e:
+            _log(f"WARNING: Could not start update checker: {e}")
+
+    threading.Thread(target=_delayed_update_check, daemon=True).start()
 
     # Keep main thread alive so the daemon Flask thread keeps running
     try:

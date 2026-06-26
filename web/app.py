@@ -81,7 +81,10 @@ from src.auth_client import (
 )
 
 # ── Flask app setup ───────────────────────────────────────────────────────────
-app = Flask(__name__, template_folder="templates", static_folder="static")
+_WEB_DIR = Path(__file__).resolve().parent
+app = Flask(__name__,
+            template_folder=str(_WEB_DIR / "templates"),
+            static_folder=str(_WEB_DIR / "static"))
 app.secret_key = os.environ.get("FLASK_SECRET", "stationdeck-dev-secret-2026")
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -919,33 +922,36 @@ def generate_annual():
     if guard:
         return jsonify({"success": False, "message": "Access denied."}), 403
 
+    report_mode   = request.form.get("report_mode", "fy")   # "fy" or "last12"
     fy_start_year = request.form.get("fy_start_year", type=int)
 
-    if not fy_start_year:
+    if report_mode == "fy" and not fy_start_year:
         return jsonify({"success": False, "message": "Financial year is required."})
 
     try:
         station_config = load_station_config(STATION_ID)
 
-        from src.processor import process_annual_report
         from src.ai_engine  import generate_annual_report
         from src.exporter   import ExportEngine
 
-        logger.info(f"Generating annual report for FY {fy_start_year}/{str(fy_start_year+1)[-2:]}")
-        metrics = process_annual_report(fy_start_year, station_config)
+        if report_mode == "last12":
+            from src.processor import process_last12_months_report
+            logger.info("Generating annual report for last 12 months of data")
+            metrics = process_last12_months_report(station_config)
+        else:
+            from src.processor import process_annual_report
+            logger.info(f"Generating annual report for FY {fy_start_year}/{str(fy_start_year+1)[-2:]}")
+            metrics = process_annual_report(fy_start_year, station_config)
 
-        fy_label     = metrics.get("fy_label", f"FY {fy_start_year}/{str(fy_start_year+1)[-2:]}")
-        period_label = metrics.get(
-            "period_label",
-            f"{fy_label} (July {fy_start_year} – June {fy_start_year+1})"
-        )
+        fy_label     = metrics.get("fy_label", "Annual Report")
+        period_label = metrics.get("period_label", fy_label)
 
         months_with_data = metrics.get("months_with_data", 0)
         if months_with_data == 0:
             return jsonify({
                 "success": False,
                 "message": (
-                    f"No data found for FY {fy_start_year}/{str(fy_start_year+1)[-2:]}. "
+                    f"No data found for {period_label}. "
                     f"Please ensure the Daily Cash Flow file has been uploaded."
                 )
             })

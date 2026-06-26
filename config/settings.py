@@ -56,7 +56,7 @@ STATION_LOCATION    = os.getenv("STATION_LOCATION", "Uganda")
 # OPENAI API SETTINGS
 # =============================================================
 OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL        = "gpt-4o-mini"
+OPENAI_MODEL        = "gpt-4o"   # full model — far better at handwritten digits than -mini
 AI_MAX_TOKENS       = 2000
 AI_TEMPERATURE      = 0.3
 

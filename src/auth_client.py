@@ -33,7 +33,7 @@ def register_station(station_name, password, email, phone,
         if response.status_code == 201 and data.get("success"):
             return True, data.get("message", "Registration successful."), data.get("license_key")
         else:
-            return False, data.get("error", "Registration failed."), None
+            return False, data.get("error", data.get("message", "Registration failed.")), None
 
     except requests.exceptions.ConnectionError:
         return False, "Cannot reach StationDeck server. Check your internet connection.", None

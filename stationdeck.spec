@@ -125,6 +125,8 @@ hidden_imports = [
     "PIL.Image",
     "PIL.ImageFilter",
     "PIL.ImageOps",
+    "PIL.ImageEnhance",   # v1.0.3 — used by OCR crop enhancement
+    "PIL.ImageDraw",      # used by OCR tiling
 
     # OCR -- pytesseract is optional; app degrades gracefully if absent
     "pytesseract",

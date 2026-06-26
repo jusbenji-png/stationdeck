@@ -287,11 +287,19 @@ document.getElementById('registerForm').addEventListener('submit', async functio
 
         if (data.success) {
             successBox.innerHTML = `
-                <strong>Registration successful!</strong><br>
-                Your license key is:<br><br>
-                <strong style="font-size:16px;letter-spacing:2px">${data.license_key}</strong><br><br>
-                Copy this key and click <a href="/activate" style="color:#6bcb77">Activate</a>
-                to complete setup.
+                <strong>Registration successful! Your 30-day free trial has started.</strong><br><br>
+                Your license key has been <strong>emailed to you</strong>. Check your inbox
+                (and spam folder) for a message from StationDeck.<br><br>
+                Your key is also shown here as a backup — copy it now:<br><br>
+                <code style="display:block;font-size:15px;letter-spacing:2px;
+                             background:#0d1a0d;padding:10px 14px;border-radius:6px;
+                             word-break:break-all;">${data.license_key}</code><br>
+                <a href="/activate"
+                   style="display:inline-block;background:#C8102E;color:#fff;
+                          padding:10px 22px;border-radius:6px;font-weight:700;
+                          text-decoration:none;margin-top:4px;">
+                    Activate Now &rarr;
+                </a>
             `;
             successBox.style.display = 'block';
             document.getElementById('registerForm').style.display = 'none';
