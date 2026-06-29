@@ -37,18 +37,31 @@ import socket
 from pathlib import Path
 
 # ── Console safety ────────────────────────────────────────────────────────────
-# In a windowed (console=False) frozen build, sys.stdout/stderr can be None, and
-# on Windows the console codec may be cp1252 — either one makes a stray
-# print() of a unicode char (e.g. the ✅/❌ used in processor logs) raise and
-# abort whatever route is running (e.g. report generation). Make prints safe.
+# In a windowed (console=False) frozen build, sys.stdout/stderr are None, and on
+# Windows the console codec may be cp1252 — either one makes a stray print() of a
+# unicode char (e.g. the ✅/❌ in processor logs) raise and abort whatever route
+# is running (e.g. report generation). We make prints safe by swapping a None
+# stream for a discarding stream. IMPORTANT: that stream must NOT expose fileno(),
+# otherwise Flask's startup banner (via click) probes it as a Windows console and
+# crashes with "I/O operation on closed file".
+class _NullStream:
+    encoding = "utf-8"
+    errors   = "replace"
+    def write(self, *a, **k):   return 0
+    def writelines(self, *a):   pass
+    def flush(self):            pass
+    def isatty(self):           return False
+    def writable(self):         return True
+    def readable(self):         return False
+    def seekable(self):         return False
+    def close(self):            pass
+    # deliberately no fileno() — click then treats this as a non-console stream
+
 def _make_streams_safe():
     for name in ("stdout", "stderr"):
         stream = getattr(sys, name, None)
         if stream is None:
-            try:
-                setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
-            except Exception:
-                pass
+            setattr(sys, name, _NullStream())
         else:
             try:
                 stream.reconfigure(encoding="utf-8", errors="replace")
