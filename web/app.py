@@ -368,16 +368,16 @@ def login():
             logger.warning(f"Auth server unreachable: {e}")
             auth_server_error = "offline"
 
-        # ── Local fallback ────────────────────────────────────────────────────
-        if password == STATION_PASSWORD:
+        # ── Local fallback — ONLY when the auth server is unreachable ─────────
+        # When the server IS reachable and rejects the password, that rejection
+        # is final. We must NOT accept the local STATION_PASSWORD online, or it
+        # would be a universal backdoor that survives password resets.
+        if auth_server_error == "offline" and password == STATION_PASSWORD:
             session["logged_in"]  = True
             session["station_id"] = STATION_ID
             session["auth_mode"]  = "local"
             session["is_dev"]     = False
-            if auth_server_error == "offline":
-                flash("Welcome back! (offline mode — auth server unreachable)", "success")
-            else:
-                flash("Welcome back!", "success")
+            flash("Welcome back! (offline mode — auth server unreachable)", "success")
             return redirect(url_for("dashboard"))
 
         if auth_server_error and auth_server_error != "offline":
