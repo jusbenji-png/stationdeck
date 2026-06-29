@@ -670,8 +670,12 @@ function generateMonthly() {
             btn.disabled    = false;
             btn.textContent = 'Generate Report';
             if (data.success) {
+                var monthName = document.getElementById('gen-month').selectedOptions[0].text;
+                _lastReport.monthly = { files: data.files, period: monthName + ' ' + year };
                 status.className   = 'show done';
-                status.textContent = '✅ ' + data.message + ' Refresh the page to see new files.';
+                status.innerHTML   = '✅ ' + data.message + ' Refresh the page to see new files. ' +
+                    '<button type="button" onclick="emailReport(\'monthly\')" ' +
+                    'style="margin-left:8px;padding:4px 10px;cursor:pointer;">📧 Email to recipients</button>';
             } else {
                 status.className   = 'show fail';
                 status.textContent = '❌ ' + data.message;
@@ -738,8 +742,11 @@ function generateAnnual() {
             btn.disabled    = false;
             btn.textContent = 'Generate Annual Report';
             if (data.success) {
+                _lastReport.annual = { files: data.files, period: periodDesc };
                 status.className   = 'show done';
-                status.textContent = '✅ ' + data.message + ' Refresh the page to see new files.';
+                status.innerHTML   = '✅ ' + data.message + ' Refresh the page to see new files. ' +
+                    '<button type="button" onclick="emailReport(\'annual\')" ' +
+                    'style="margin-left:8px;padding:4px 10px;cursor:pointer;">📧 Email to recipients</button>';
             } else {
                 status.className   = 'show fail';
                 status.textContent = '❌ ' + data.message;
@@ -751,6 +758,25 @@ function generateAnnual() {
             status.className   = 'show fail';
             status.textContent = '❌ Network error. Check that StationDeck is running.';
         });
+}
+
+// ══════════════════════════════════════════════════════════
+// EMAIL REPORT TO RECIPIENTS (routed through StationDeck server)
+// ══════════════════════════════════════════════════════════
+var _lastReport = { monthly: null, annual: null };
+
+function emailReport(scope) {
+    var r = _lastReport[scope];
+    if (!r || !r.files) { alert('Generate the report first.'); return; }
+    if (!confirm('Email the ' + r.period + ' report to the station recipients?')) return;
+    fetch('/email_report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: r.files, period_label: r.period })
+    })
+    .then(function(res){ return res.json(); })
+    .then(function(d){ alert(d.success ? ('✅ ' + d.message) : ('❌ ' + d.message)); })
+    .catch(function(){ alert('❌ Could not reach StationDeck to send the email.'); });
 }
 </script>
 
