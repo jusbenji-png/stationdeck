@@ -1407,7 +1407,9 @@ class ExportEngine:
         row = _xl_sheet_header(
             ws,
             f"{self.station_name} \u2014 Annual Performance",
-            f"{fy_label} (July {metrics.get('fy_start_year','')} – June {metrics.get('fy_start_year',0)+1})",
+            (f"{fy_label} (July {metrics['fy_start_year']} – June {metrics['fy_start_year']+1})"
+             if metrics.get('fy_start_year') is not None
+             else metrics.get('period_label', fy_label)),
             col_count=3,
         )
 

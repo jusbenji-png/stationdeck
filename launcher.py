@@ -36,6 +36,27 @@ import traceback
 import socket
 from pathlib import Path
 
+# ── Console safety ────────────────────────────────────────────────────────────
+# In a windowed (console=False) frozen build, sys.stdout/stderr can be None, and
+# on Windows the console codec may be cp1252 — either one makes a stray
+# print() of a unicode char (e.g. the ✅/❌ used in processor logs) raise and
+# abort whatever route is running (e.g. report generation). Make prints safe.
+def _make_streams_safe():
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            try:
+                setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+            except Exception:
+                pass
+        else:
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+_make_streams_safe()
+
 # ── Path setup ────────────────────────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
     BUNDLE_DIR  = Path(sys._MEIPASS)
