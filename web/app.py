@@ -898,7 +898,11 @@ def generate():
 
         metrics      = process_monthly_report(month, year, station_config)
         period_label = datetime(year, month, 1).strftime("%B %Y")
-        ai_result    = generate_report(metrics, period_label)
+        ai_result    = generate_report(
+            metrics, period_label,
+            station_name=session.get("station_name"),
+            machine_id=get_machine_id(STATION_ID),
+        )
         sections     = ai_result.get("sections", {})
         daily_df     = metrics.get("daily_df", df_check)
 
@@ -966,7 +970,11 @@ def generate_annual():
                 )
             })
 
-        ai_result = generate_annual_report(metrics, period_label)
+        ai_result = generate_annual_report(
+            metrics, period_label,
+            station_name=session.get("station_name"),
+            machine_id=get_machine_id(STATION_ID),
+        )
         sections  = ai_result.get("sections", {})
 
         engine    = ExportEngine(station_config=station_config)

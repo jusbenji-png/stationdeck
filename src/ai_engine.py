@@ -40,12 +40,74 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# =============================================================
+# AI BACKEND
+# =============================================================
+# Primary: route narrative generation through the StationDeck server (the
+# OpenAI key lives only on the server). Fallback: local OPENAI_API_KEY (dev).
+# Final fallback: deterministic placeholder text (never crashes a report).
+_AI_SERVER_URL = "https://web-production-46077.up.railway.app/ai"
+
+_MONTHLY_SYSTEM = (
+    "You are a Senior Financial Analyst specialising in petroleum retail "
+    "operations in East Africa. You write formal, professional operational "
+    "reports for fuel station managers and company directors."
+)
+_ANNUAL_SYSTEM = (
+    "You are a Senior Financial Analyst specialising in petroleum retail "
+    "operations in East Africa. You write formal annual operational reports "
+    "for fuel station directors and regional management."
+)
+
+
+def _server_chat(system, prompt, model, max_tokens, temperature,
+                 station_name, machine_id):
+    """Call the StationDeck server /ai endpoint. Returns text or None."""
+    if not (station_name and machine_id):
+        return None
+    try:
+        import requests
+        r = requests.post(_AI_SERVER_URL, json={
+            "station_name": station_name, "machine_id": machine_id,
+            "system": system, "prompt": prompt,
+            "model": model, "max_tokens": max_tokens, "temperature": temperature,
+        }, timeout=120)
+        data = r.json()
+        if data.get("success"):
+            return data.get("text")
+        logger.error(f"Server AI failed ({r.status_code}): {data.get('message')}")
+        return None
+    except Exception as e:
+        logger.error(f"Server AI request failed: {e}")
+        return None
+
+
+def _local_chat(system, prompt, model, max_tokens, temperature):
+    """Fallback: call OpenAI directly with a local key (dev). Returns text or None."""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key or api_key.startswith("sk-placeholder") or api_key == "your_api_key_here":
+        return None
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": prompt}],
+            temperature=temperature, max_tokens=max_tokens,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Local OpenAI call failed: {e}")
+        return None
+
 
 # =============================================================
 # MAIN PUBLIC FUNCTIONS
 # =============================================================
 
-def generate_report(metrics: dict, period_label: str) -> dict:
+def generate_report(metrics: dict, period_label: str,
+                    station_name: str = None, machine_id: str = None) -> dict:
     """
     Generate a full narrative monthly report from processed metrics.
 
@@ -58,54 +120,31 @@ def generate_report(metrics: dict, period_label: str) -> dict:
     Returns:
         dict: { "period", "mode", "report_text", "sections" }
     """
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    prompt = _build_monthly_prompt(metrics, period_label)
 
-    if not api_key or api_key.startswith("sk-placeholder") or api_key == "your_api_key_here":
-        logger.warning("No valid OpenAI API key found. Running in placeholder mode.")
+    # 1) Server (key on server) → 2) local key (dev) → 3) placeholder
+    raw_text = _server_chat(_MONTHLY_SYSTEM, prompt, "gpt-4o-mini", 4000, 0.4,
+                            station_name, machine_id)
+    if raw_text is None:
+        raw_text = _local_chat(_MONTHLY_SYSTEM, prompt, "gpt-4o-mini", 4000, 0.4)
+
+    if raw_text is None:
+        logger.warning("No AI backend available — monthly report in placeholder mode.")
         return _placeholder_report(period_label, metrics)
 
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        prompt = _build_monthly_prompt(metrics, period_label)
-
-        logger.info(f"Sending prompt to OpenAI for period: {period_label}")
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a Senior Financial Analyst specialising in "
-                        "petroleum retail operations in East Africa. "
-                        "You write formal, professional operational reports "
-                        "for fuel station managers and company directors."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.4,
-            max_tokens=4000,
-        )
-
-        raw_text = response.choices[0].message.content.strip()
-        sections = _parse_monthly_sections(raw_text)
-
-        logger.info("OpenAI monthly report generation successful.")
-        return {
-            "period":      period_label,
-            "mode":        "live",
-            "report_text": raw_text,
-            "sections":    sections,
-        }
-
-    except Exception as e:
-        logger.error(f"OpenAI API call failed: {e}. Falling back to placeholder mode.")
-        return _placeholder_report(period_label, metrics)
+    raw_text = raw_text.strip()
+    sections = _parse_monthly_sections(raw_text)
+    logger.info("Monthly report narrative generated.")
+    return {
+        "period":      period_label,
+        "mode":        "live",
+        "report_text": raw_text,
+        "sections":    sections,
+    }
 
 
-def generate_annual_report(metrics: dict, period_label: str) -> dict:
+def generate_annual_report(metrics: dict, period_label: str,
+                           station_name: str = None, machine_id: str = None) -> dict:
     """
     Generate a full narrative annual report from processed metrics.
 
@@ -116,51 +155,27 @@ def generate_annual_report(metrics: dict, period_label: str) -> dict:
     Returns:
         dict: { "period", "mode", "report_text", "sections" }
     """
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    prompt = _build_annual_prompt(metrics, period_label)
 
-    if not api_key or api_key.startswith("sk-placeholder") or api_key == "your_api_key_here":
-        logger.warning("No valid OpenAI API key. Running annual placeholder mode.")
+    # 1) Server (key on server) → 2) local key (dev) → 3) placeholder
+    raw_text = _server_chat(_ANNUAL_SYSTEM, prompt, "gpt-4o-mini", 4000, 0.4,
+                            station_name, machine_id)
+    if raw_text is None:
+        raw_text = _local_chat(_ANNUAL_SYSTEM, prompt, "gpt-4o-mini", 4000, 0.4)
+
+    if raw_text is None:
+        logger.warning("No AI backend available — annual report in placeholder mode.")
         return _placeholder_annual_report(period_label, metrics)
 
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        prompt = _build_annual_prompt(metrics, period_label)
-
-        logger.info(f"Sending annual prompt to OpenAI for period: {period_label}")
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a Senior Financial Analyst specialising in "
-                        "petroleum retail operations in East Africa. "
-                        "You write formal annual operational reports for fuel "
-                        "station directors and regional management."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.4,
-            max_tokens=4000,
-        )
-
-        raw_text = response.choices[0].message.content.strip()
-        sections = _parse_annual_sections(raw_text)
-
-        logger.info("OpenAI annual report generation successful.")
-        return {
-            "period":      period_label,
-            "mode":        "live",
-            "report_text": raw_text,
-            "sections":    sections,
-        }
-
-    except Exception as e:
-        logger.error(f"OpenAI annual API call failed: {e}. Falling back to placeholder.")
-        return _placeholder_annual_report(period_label, metrics)
+    raw_text = raw_text.strip()
+    sections = _parse_annual_sections(raw_text)
+    logger.info("Annual report narrative generated.")
+    return {
+        "period":      period_label,
+        "mode":        "live",
+        "report_text": raw_text,
+        "sections":    sections,
+    }
 
 
 # =============================================================
