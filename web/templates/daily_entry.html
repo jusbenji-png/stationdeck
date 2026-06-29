@@ -423,6 +423,21 @@
                 </label>
             </div>
 
+            <div class="de-excel-fallback" style="margin-top:12px;border-top:1px solid #eee;padding-top:14px;">
+                <div>
+                    <div class="de-ef-title">🗑️ Clear imported data</div>
+                    <div class="de-ef-sub">Removes records from the database (affects reports). Your Excel files are not touched.</div>
+                    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <input type="date" id="de-clear-date"
+                               style="padding:7px;border:1px solid #ccc;border-radius:6px;" />
+                        <button class="de-btn de-secondary" onclick="deClearSpecific()">Clear Specific Date</button>
+                    </div>
+                </div>
+                <button class="de-btn de-secondary"
+                        style="border-color:#c0392b;color:#c0392b;align-self:flex-start;"
+                        onclick="deClearAll()">Clear All Data</button>
+            </div>
+
             <div class="de-bottom-bar">
                 <div class="de-bottom-status"><strong id="de-import-status">No files imported yet</strong></div>
                 <div class="de-btn-group">
@@ -862,6 +877,33 @@ function deExcelSelected(input) {
             }
         })
         .catch(() => { deHideLoading(); alert('Connection error during import.'); });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLEAR IMPORTED DATA
+// ═══════════════════════════════════════════════════════════════════
+function deClearAll() {
+    if (!confirm('Delete ALL imported records from the database?\n\nThis cannot be undone. Your Excel files are not affected.')) return;
+    deShowLoading('Clearing all data...');
+    fetch('/daily_entry/clear_all', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { deHideLoading(); alert(d.success ? ('✅ ' + d.message) : ('❌ ' + d.message)); })
+        .catch(() => { deHideLoading(); alert('Connection error while clearing data.'); });
+}
+
+function deClearSpecific() {
+    const date = document.getElementById('de-clear-date').value;
+    if (!date) { alert('Pick a date to clear first.'); return; }
+    if (!confirm('Delete all records for ' + date + '?\n\nThis cannot be undone.')) return;
+    deShowLoading('Clearing data for ' + date + '...');
+    fetch('/daily_entry/clear_date', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: date })
+    })
+        .then(r => r.json())
+        .then(d => { deHideLoading(); alert(d.success ? ('✅ ' + d.message) : ('❌ ' + d.message)); })
+        .catch(() => { deHideLoading(); alert('Connection error while clearing data.'); });
 }
 
 // ═══════════════════════════════════════════════════════════════════

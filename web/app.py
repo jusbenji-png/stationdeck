@@ -67,6 +67,8 @@ from src.database import (
     get_records_by_month,
     get_record_count,
     get_date_range_stored,
+    delete_all_records,
+    delete_records_by_date,
 )
 from config.station_loader import load_station_config
 
@@ -735,6 +737,45 @@ def daily_entry_import_excel():
         msg = f"{total_imported} records imported. " + msg
 
     return jsonify({"success": True, "message": msg, "fields": {}})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DAILY ENTRY — clear imported data from the database
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/daily_entry/clear_all", methods=["POST"])
+def daily_entry_clear_all():
+    guard = license_guard() or require_login()
+    if guard:
+        return jsonify({"success": False, "message": "Access denied."}), 403
+    try:
+        count = delete_all_records(STATION_ID)
+        return jsonify({"success": True,
+                        "message": f"Cleared all data — {count} record(s) removed."})
+    except Exception as e:
+        logger.error(f"Clear all failed: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"Could not clear data: {e}"})
+
+
+@app.route("/daily_entry/clear_date", methods=["POST"])
+def daily_entry_clear_date():
+    guard = license_guard() or require_login()
+    if guard:
+        return jsonify({"success": False, "message": "Access denied."}), 403
+    data = request.get_json(silent=True) or {}
+    date_str = (data.get("date") or "").strip()
+    if not date_str:
+        return jsonify({"success": False, "message": "No date provided."})
+    try:
+        count = delete_records_by_date(date_str, STATION_ID)
+        if count == 0:
+            return jsonify({"success": True,
+                            "message": f"No records found for {date_str}."})
+        return jsonify({"success": True,
+                        "message": f"Cleared {count} record(s) for {date_str}."})
+    except Exception as e:
+        logger.error(f"Clear date failed: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"Could not clear data: {e}"})
 
 
 # ──────────────────────────────────────────────────────────────────────────────
