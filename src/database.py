@@ -303,6 +303,41 @@ def get_record_count(station_id: str = "te_rwizi") -> int:
         return 0
 
 
+def delete_all_records(station_id: str = "te_rwizi") -> int:
+    """Delete ALL daily records for a station. Returns number of rows removed."""
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM daily_records WHERE station_id = ?", (station_id,))
+        removed = cursor.rowcount
+        conn.commit()
+        conn.close()
+        logger.info(f"delete_all_records(): removed {removed} rows for {station_id}")
+        return removed
+    except Exception as e:
+        logger.error(f"delete_all_records() failed: {e}")
+        return 0
+
+
+def delete_records_by_date(date_str: str, station_id: str = "te_rwizi") -> int:
+    """Delete records for a single date (YYYY-MM-DD). Returns rows removed."""
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM daily_records WHERE station_id = ? AND date = ?",
+            (station_id, date_str),
+        )
+        removed = cursor.rowcount
+        conn.commit()
+        conn.close()
+        logger.info(f"delete_records_by_date({date_str}): removed {removed} rows")
+        return removed
+    except Exception as e:
+        logger.error(f"delete_records_by_date() failed: {e}")
+        return 0
+
+
 def get_date_range_stored(station_id: str = "te_rwizi") -> dict:
     try:
         conn = _get_connection()

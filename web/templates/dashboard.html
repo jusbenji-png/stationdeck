@@ -621,7 +621,20 @@ function previewMonth() {
             `;
 
             // Helpful note below the grid
-            if (d.anomaly_days > 0) {
+            const gaps = d.data_gaps || [];
+            if (gaps.length > 0) {
+                // Specific "what's still to enter" checklist
+                note.style.display = 'block';
+                let items = gaps.map(function(g) {
+                    const shown = g.dates.slice(0, 12).join(', ');
+                    const more  = g.dates.length > 12 ? ` +${g.dates.length - 12} more` : '';
+                    return `<li><strong>${g.label}</strong> — ${g.count} day(s): ${shown}${more}</li>`;
+                }).join('');
+                note.innerHTML = `<strong>⚠ Still to enter for this month:</strong>
+                    <ul style="margin:6px 0 0 18px;padding:0;">${items}</ul>
+                    <div style="margin-top:6px;">Until these are filled in, the cash delta will
+                    show a large shortage that isn't real. Enter them and re-upload to correct it.</div>`;
+            } else if (d.anomaly_days > 0) {
                 note.style.display = 'block';
                 note.innerHTML = `<strong>Note:</strong> ${d.anomaly_days} day(s) have a non-zero delta.
                     This is normal if some days had cash variances. The report will include details.

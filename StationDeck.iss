@@ -1,13 +1,13 @@
 [Setup]
 AppId={{A7F3D2E1-4B8C-4F9A-B2D6-1E3A5C7F9B2D}
 AppName=StationDeck
-AppVersion=1.0.3
+AppVersion=1.0.5
 AppPublisher=StationDeck
 DefaultDirName={autopf}\StationDeck
 DefaultGroupName=StationDeck
 DisableProgramGroupPage=yes
 OutputDir=C:\Users\LENOVO\stationdeck\installer
-OutputBaseFilename=StationDeck_Setup_v1.0.3
+OutputBaseFilename=StationDeck_Setup_v1.0.5
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

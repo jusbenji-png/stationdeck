@@ -43,6 +43,53 @@ MONTH_NAMES = {
 }
 
 
+def _estimated_pnl(metrics: dict) -> dict:
+    """
+    Compute a conservative estimated Profit & Loss from data the app already
+    has, so a report is meaningful even when no manager's report is loaded.
+
+        Fuel gross profit = fuel turnover − (cost price × litres sold)
+        Net profit (est.) = fuel gross profit − total operating expenses
+
+    This is deliberately FUEL-BASIS only. Non-fuel lines (shop, lubricants,
+    LPG…) have real margin, but their cost of goods is not tracked, so counting
+    their revenue as profit would overstate. We therefore exclude them — the
+    estimate is a conservative floor, clearly flagged, not an audited figure.
+    A full P&L (including non-fuel margin) still needs the manager's report.
+    Returns {} if there isn't enough fuel data to estimate.
+    """
+    fs = metrics.get("fuel_stock", {}) or {}
+    pms = fs.get("pms", {}) or {}
+    ago = fs.get("ago", {}) or {}
+
+    fuel_turnover = pms.get("turnover_ugx", 0) + ago.get("turnover_ugx", 0)
+    if fuel_turnover <= 0:
+        return {}
+
+    # Cost of fuel sold = cost price × litres sold. If a product has turnover
+    # but no cost price (e.g. an annual aggregate doesn't carry avg price),
+    # we can't estimate reliably — skip rather than show a wrong number.
+    fuel_cogs = 0
+    for prod in (pms, ago):
+        t  = prod.get("turnover_ugx", 0)
+        cp = prod.get("avg_cost_price_ugx", 0)
+        if t > 0 and cp <= 0:
+            return {}
+        fuel_cogs += cp * prod.get("total_sales_ltrs", 0)
+
+    fuel_gross = fuel_turnover - fuel_cogs
+    expenses   = metrics.get("total_expenses", 0)
+    net_profit = fuel_gross - expenses
+
+    return {
+        "estimated":         True,
+        "estimate_basis":    "fuel",
+        "gross_income":      round(fuel_gross, 0),
+        "net_profit":        round(net_profit, 0),
+        "reserve_balance":   0,
+    }
+
+
 # ============================================================
 # MONTHLY REPORT PROCESSOR
 # ============================================================
@@ -285,6 +332,18 @@ def process_monthly_report(month: int, year: int, station_config: dict) -> dict:
         metrics["financial_position"] = {}
         metrics["claims"]             = {}
         metrics["money_meters"]       = {}
+
+    # ── Estimated P&L fallback ───────────────────────────────
+    # If the manager's report has no usable P&L (e.g. none loaded for this
+    # month), compute an estimate from fuel margin + non-fuel revenue − expenses
+    # so the Profit & Loss section is never just blank zeros.
+    pnl = metrics.get("pnl") or {}
+    if not (pnl.get("gross_income", 0) or pnl.get("net_profit", 0)):
+        est = _estimated_pnl(metrics)
+        if est:
+            metrics["pnl"] = est
+            print(f"  ℹ️  Using estimated P&L (no manager report) — "
+                  f"net profit ≈ UGX {est['net_profit']:,.0f}")
 
     # --------------------------------------------------------
     # METADATA

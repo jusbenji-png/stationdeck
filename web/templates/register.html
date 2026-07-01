@@ -286,14 +286,23 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         const data = await response.json();
 
         if (data.success) {
+            const licenseKey = data.license_key;
             successBox.innerHTML = `
                 <strong>Registration successful! Your 30-day free trial has started.</strong><br><br>
                 Your license key has been <strong>emailed to you</strong>. Check your inbox
                 (and spam folder) for a message from StationDeck.<br><br>
                 Your key is also shown here as a backup — copy it now:<br><br>
-                <code style="display:block;font-size:15px;letter-spacing:2px;
+                <code id="licenseKeyBox" style="display:block;font-size:15px;letter-spacing:2px;
                              background:#0d1a0d;padding:10px 14px;border-radius:6px;
-                             word-break:break-all;">${data.license_key}</code><br>
+                             word-break:break-all;">${licenseKey}</code>
+                <button id="copyKeyBtn" onclick="
+                    navigator.clipboard.writeText('${licenseKey.replace(/'/g, "\\'")}').then(function(){
+                        document.getElementById('copyKeyBtn').textContent = '✓ Copied!';
+                        setTimeout(function(){ document.getElementById('copyKeyBtn').textContent = 'Copy Key'; }, 2000);
+                    });
+                " style="margin-top:8px;background:#2a4a2a;color:#6bcb77;border:1px solid #28a745;
+                         border-radius:6px;padding:8px 18px;font-size:13px;font-weight:700;
+                         cursor:pointer;width:100%;">Copy Key</button><br>
                 <a href="/activate"
                    style="display:inline-block;background:#C8102E;color:#fff;
                           padding:10px 22px;border-radius:6px;font-weight:700;

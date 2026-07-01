@@ -78,7 +78,7 @@ copy "config\stations\te_rwizi.yaml" "dist\StationDeck\config\stations\te_rwizi.
 echo     Copied: config\stations\te_rwizi.yaml
 
 REM Write version file directly from AppVersion — never gets out of sync
-set STATIONDECK_VERSION=1.0.3
+set STATIONDECK_VERSION=1.0.5
 echo %STATIONDECK_VERSION%> "dist\StationDeck\config\version.txt"
 echo     Written: config\version.txt (%STATIONDECK_VERSION%)
 

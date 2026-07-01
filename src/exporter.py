@@ -571,10 +571,11 @@ class ExportEngine:
         ]
 
         pnl = metrics.get("pnl", {})
+        _est = " (Estimated)" if pnl.get("estimated") else ""
         if pnl.get("gross_income", 0):
-            data.append([Paragraph("Gross Income", C),    Paragraph(_fmt(pnl.get("gross_income",0),currency_symbol=cur), R)])
+            data.append([Paragraph("Gross Income" + _est, C), Paragraph(_fmt(pnl.get("gross_income",0),currency_symbol=cur), R)])
         if pnl.get("net_profit", 0):
-            data.append([Paragraph("Net Profit", C),      Paragraph(_fmt(pnl.get("net_profit",0),currency_symbol=cur), R)])
+            data.append([Paragraph("Net Profit" + _est, C),  Paragraph(_fmt(pnl.get("net_profit",0),currency_symbol=cur), R)])
         if pnl.get("reserve_balance", 0):
             data.append([Paragraph("Reserve Balance", C), Paragraph(_fmt(pnl.get("reserve_balance",0),currency_symbol=cur), R)])
 
@@ -971,10 +972,11 @@ class ExportEngine:
             ["Total Revenue",         _fmt(_safe(metrics,"total_revenue"),currency_symbol=cur)],
             ["Avg Daily Fuel Revenue",_fmt(_safe(metrics,"avg_daily_fuel_revenue"),currency_symbol=cur)],
         ]
+        _est = " (Estimated)" if pnl.get("estimated") else ""
         if pnl.get("gross_income",0):
-            rows.append(["Gross Income",    _fmt(pnl["gross_income"],currency_symbol=cur)])
+            rows.append(["Gross Income" + _est,    _fmt(pnl["gross_income"],currency_symbol=cur)])
         if pnl.get("net_profit",0):
-            rows.append(["Net Profit",      _fmt(pnl["net_profit"],currency_symbol=cur)])
+            rows.append(["Net Profit" + _est,      _fmt(pnl["net_profit"],currency_symbol=cur)])
         if pnl.get("reserve_balance",0):
             rows.append(["Reserve Balance", _fmt(pnl["reserve_balance"],currency_symbol=cur)])
         self._docx_table(doc, ["Item", "Amount"], rows)
@@ -1159,12 +1161,15 @@ class ExportEngine:
         ])
 
         pnl = metrics.get("pnl", {})
-        row = write_section(row, "PROFIT & LOSS", [
+        _est = " (Estimated)" if pnl.get("estimated") else ""
+        pnl_rows = [
             ("Total Expenses",       _fmt(_safe(metrics,"total_expenses"),currency_symbol=cur)),
-            ("Gross Income",         _fmt(pnl.get("gross_income",0),currency_symbol=cur)),
-            ("Net Profit",           _fmt(pnl.get("net_profit",0),currency_symbol=cur)),
-            ("Reserve Balance",      _fmt(pnl.get("reserve_balance",0),currency_symbol=cur)),
-        ])
+            ("Gross Income" + _est,  _fmt(pnl.get("gross_income",0),currency_symbol=cur)),
+            ("Net Profit" + _est,    _fmt(pnl.get("net_profit",0),currency_symbol=cur)),
+        ]
+        if pnl.get("reserve_balance", 0):
+            pnl_rows.append(("Reserve Balance", _fmt(pnl.get("reserve_balance",0),currency_symbol=cur)))
+        row = write_section(row, "PROFIT & LOSS", pnl_rows)
 
         delta_status = str(_safe(metrics,"delta_status","UNKNOWN"))
         delta_color  = XL_GREEN if delta_status == "SURPLUS" else XL_RED

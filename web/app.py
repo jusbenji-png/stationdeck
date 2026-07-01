@@ -39,7 +39,9 @@ from datetime import datetime
 from io import BytesIO
 import logging
 import os
+import re
 import json
+import yaml
 
 # ── ROOT path — frozen-aware ──────────────────────────────────────────────────
 # When running as a PyInstaller .exe, __file__ points inside _internal/,
@@ -98,11 +100,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── Station config ────────────────────────────────────────────────────────────
-# IMPORTANT: STATION_ID must remain "te_rwizi" — this is the local license
-# file key and SQLite database key. Changing it breaks local license lookup.
-# The display name shown in the navbar comes from session["station_name"]
-# which is set to the auth server name (_jus.benji_) on cloud login.
-STATION_ID       = "te_rwizi"
+def _slugify(name: str) -> str:
+    """Convert a station name to a safe internal ID, e.g. 'Nakivubo Shell' → 'nakivubo_shell'."""
+    slug = name.lower().strip()
+    slug = re.sub(r'[^a-z0-9]+', '_', slug)
+    return slug.strip('_') or "station"
+
+def _load_station_id() -> str:
+    """Load the station's internal ID from local config; fall back to 'te_rwizi'."""
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA", "")
+    id_file = Path(_appdata) / "StationDeck" / "station_id.txt"
+    if id_file.exists():
+        val = id_file.read_text(encoding="utf-8").strip()
+        if val:
+            return val
+    return "te_rwizi"
+
+STATION_ID       = _load_station_id()
 STATION_PASSWORD = os.environ.get("STATION_PASSWORD", "stationdeck123")
 
 # ── Uganda Financial Year helpers ─────────────────────────────────────────────
@@ -263,23 +277,76 @@ def register():
     return render_template("register.html")
 
 
+def _create_station_yaml(slug: str, station_name: str, email: str, location: str) -> None:
+    """Write a minimal station YAML to the writable user data dir."""
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA", "")
+    stations_dir = Path(_appdata) / "StationDeck" / "stations"
+    stations_dir.mkdir(parents=True, exist_ok=True)
+    yaml_path = stations_dir / f"{slug}.yaml"
+    if yaml_path.exists():
+        return  # already created; don't overwrite
+    config = {
+        "station": {
+            "id":       slug,
+            "name":     station_name,
+            "location": location,
+            "operator": station_name,
+            "currency": "UGX",
+            "timezone": "Africa/Kampala",
+        },
+        "files": {
+            "cashflow": "Daily_cash_flow.xlsx",
+            "stock":    "Stock_mvt.xlsx",
+            "shop":     "Shop_monthly_sales.xlsx",
+            "manager":  "Manager_report.xlsx",
+        },
+        "reports": {"output_dir": slug},
+        "email":   {"recipients": [email]},
+        "branding": {
+            "primary_color": "#C8102E",
+            "dark_color":    "#1A1A2E",
+            "accent_color":  "#1E7E34",
+        },
+        "settings": {
+            "placeholder_mode": False,
+            "archive_enabled":  True,
+            "email_enabled":    True,
+        },
+    }
+    with open(yaml_path, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+
+
 @app.route("/register", methods=["POST"])
 def register_submit():
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "No data received."}), 400
 
-    machine_id = get_machine_id(STATION_ID)
+    station_name   = data.get("station_name", "").strip()
+    email          = data.get("email", "").strip()
+    location       = data.get("location", "").strip()
+    app_station_id = _slugify(station_name)
+    machine_id     = get_machine_id(app_station_id)
+
+    # Persist the station ID so future startups load the right config
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA", "")
+    data_dir = Path(_appdata) / "StationDeck"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "station_id.txt").write_text(app_station_id, encoding="utf-8")
+
+    # Create a station YAML in the writable user dir
+    _create_station_yaml(app_station_id, station_name, email, location)
 
     success, message, license_key = register_station(
-        station_name    = data.get("station_name", "").strip(),
+        station_name    = station_name,
         password        = data.get("password", ""),
-        email           = data.get("email", "").strip(),
+        email           = email,
         phone           = data.get("phone", "").strip(),
         region          = data.get("region", "").strip(),
-        location        = data.get("location", "").strip(),
+        location        = location,
         machine_id      = machine_id,
-        app_station_id  = STATION_ID,
+        app_station_id  = app_station_id,
     )
 
     if success:
@@ -540,6 +607,43 @@ def fy_status():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# DATA COMPLETENESS CHECK
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _compute_data_gaps(df) -> list:
+    """
+    Scan a month's records and return a checklist of specifically what is still
+    missing, so the user knows exactly what to enter instead of seeing a scary
+    phantom shortage. Currently checks for un-entered banking — days where money
+    was set aside to bank (cash_to_bank > 0) but the actual banked amount is
+    blank/zero. These drive a fake cash 'deficit' until filled in.
+    """
+    gaps = []
+    if df is None or getattr(df, "empty", True):
+        return gaps
+
+    cols = df.columns
+    if "cash_to_bank" in cols and "actual_cash_banked" in cols:
+        ctb  = df["cash_to_bank"].fillna(0)
+        acb  = df["actual_cash_banked"].fillna(0)
+        miss = df[(ctb > 0) & (acb <= 0)]
+        if len(miss) > 0:
+            dates = []
+            for v in miss["date"]:
+                try:
+                    dates.append(v.strftime("%b %d"))
+                except Exception:
+                    dates.append(str(v))
+            gaps.append({
+                "label": "Cash banked not entered",
+                "field": "actual_cash_banked",
+                "count": int(len(miss)),
+                "dates": dates,
+            })
+    return gaps
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # MONTHLY PREVIEW
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -595,6 +699,7 @@ def preview_month():
         "cashless_collected": cashless, "cashless_pct": cashless_pct,
         "total_expenses": expenses, "total_delta": delta,
         "delta_status": delta_status, "anomaly_days": anomalies,
+        "data_gaps": _compute_data_gaps(df),
     })
 
 

@@ -437,16 +437,24 @@ def _fuel_metrics_for_period(df_fuel: pd.DataFrame, product: str) -> dict:
     if p.empty:
         return {}
 
+    # Days that were fully dipped (a closing dip was recorded). Trailing days
+    # where the evening dip hasn't been entered yet have a blank closing dip;
+    # the spreadsheet then books the whole tank as a one-day phantom loss, so
+    # loss/gain must be summed over complete days only — never the raw column.
+    complete = p[p["closing_dip_ltrs"] > 0]
+
     total_sales      = p["station_sales_ltrs"].sum()
     total_purchases  = p["purchases_ltrs"].sum()
-    total_loss_ltrs  = p["loss_gain_ltrs"].sum()
-    total_loss_ugx   = p["loss_gain_value_ugx"].sum()
+    total_loss_ltrs  = complete["loss_gain_ltrs"].sum()
+    total_loss_ugx   = complete["loss_gain_value_ugx"].sum()
     total_turnover   = p["turnover_ugx"].sum()
     total_purchase_value = p["purchase_value_ugx"].sum()
 
     opening_dip         = float(p.iloc[0]["opening_dip_ltrs"])
-    closing_dip         = float(p.iloc[-1]["closing_dip_ltrs"])
-    closing_stock_value = float(p.iloc[-1]["stock_value_ugx"])
+    # Use last row with a valid closing dip — final rows may be unfilled blanks
+    valid_close = complete
+    closing_dip         = float(valid_close.iloc[-1]["closing_dip_ltrs"]) if not valid_close.empty else 0.0
+    closing_stock_value = float(valid_close.iloc[-1]["stock_value_ugx"])  if not valid_close.empty else 0.0
 
     prices = p[p["cost_price_ugx"] > 0]
     avg_cost_price    = prices["cost_price_ugx"].mean()    if not prices.empty else 0

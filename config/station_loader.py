@@ -25,7 +25,11 @@ REPORTS_DIR = DATA_ROOT / "reports"
 
 
 def load_station_config(station_id: str) -> dict:
-    yaml_path = STATIONS_DIR / f"{station_id}.yaml"
+    # Check writable user dir first (stations registered at runtime),
+    # then fall back to bundled install dir (te_rwizi and pre-built configs).
+    user_yaml    = DATA_ROOT / "stations" / f"{station_id}.yaml"
+    bundled_yaml = STATIONS_DIR / f"{station_id}.yaml"
+    yaml_path    = user_yaml if user_yaml.exists() else bundled_yaml
 
     if not yaml_path.exists():
         raise FileNotFoundError(
