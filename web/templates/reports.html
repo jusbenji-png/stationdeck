@@ -9,6 +9,33 @@
         <p>Download PDF, Word, or Excel versions of your station reports.</p>
     </div>
 
+    <!-- ── EXPORT FILLED EXCEL TEMPLATES ─────────────────────── -->
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">
+            <span class="dot"></span>
+            Export Filled Excel Files
+        </div>
+        <p style="font-size:0.85rem; color:#6b7280; margin:8px 0 14px;">
+            Download your own template files with <strong>all StationDeck data filled
+            in</strong> — days you imported plus days entered in the app. Same layout as
+            the originals, so they can be shared or re-imported directly.
+        </p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <a href="{{ url_for('export_excel', kind='cashflow') }}"
+               class="btn btn-outline btn-sm" style="font-weight:600;">
+                📊 Daily Cash Flow (filled)
+            </a>
+            <a href="{{ url_for('export_excel', kind='stock') }}"
+               class="btn btn-outline btn-sm" style="font-weight:600;">
+                🛢 Stock Movement (filled)
+            </a>
+        </div>
+        <div style="margin-top:10px; font-size:0.78rem; color:#9ca3af;">
+            Cash flow exports every column. Stock movement fills daily expenses and
+            product sales — tank dips stay as imported (physical readings).
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-title">
             <span class="dot"></span>

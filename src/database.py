@@ -319,6 +319,26 @@ def delete_all_records(station_id: str = "te_rwizi") -> int:
         return 0
 
 
+def migrate_station_records(old_id: str, new_id: str) -> int:
+    """Re-key all daily records from one station id to another.
+    Used by the one-time station-ID migration. Returns rows moved."""
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE daily_records SET station_id = ? WHERE station_id = ?",
+            (new_id, old_id),
+        )
+        moved = cursor.rowcount
+        conn.commit()
+        conn.close()
+        logger.info(f"migrate_station_records(): {old_id} -> {new_id}, {moved} rows")
+        return moved
+    except Exception as e:
+        logger.error(f"migrate_station_records() failed: {e}")
+        return 0
+
+
 def delete_records_by_date(date_str: str, station_id: str = "te_rwizi") -> int:
     """Delete records for a single date (YYYY-MM-DD). Returns rows removed."""
     try:

@@ -42,6 +42,8 @@ import os
 import re
 import json
 import yaml
+import threading
+import time
 
 # ── ROOT path — frozen-aware ──────────────────────────────────────────────────
 # When running as a PyInstaller .exe, __file__ points inside _internal/,
@@ -71,6 +73,7 @@ from src.database import (
     get_date_range_stored,
     delete_all_records,
     delete_records_by_date,
+    migrate_station_records,
 )
 from config.station_loader import load_station_config
 
@@ -233,6 +236,24 @@ def check_update():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# CLOSE APP — fully quits StationDeck (background process, not just the tab)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/close_app", methods=["POST"])
+def close_app():
+    guard = require_login()
+    if guard:
+        return guard
+
+    def _shutdown():
+        time.sleep(0.5)  # let the JSON response reach the browser first
+        os._exit(0)
+
+    threading.Thread(target=_shutdown, daemon=True).start()
+    return jsonify({"status": "closing"})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # ACTIVATION AND LOCK SCREEN
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -319,6 +340,8 @@ def _create_station_yaml(slug: str, station_name: str, email: str, location: str
 
 @app.route("/register", methods=["POST"])
 def register_submit():
+    global STATION_ID
+
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "No data received."}), 400
@@ -337,6 +360,13 @@ def register_submit():
 
     # Create a station YAML in the writable user dir
     _create_station_yaml(app_station_id, station_name, email, location)
+
+    # Update the RUNNING process too — STATION_ID was loaded at import time,
+    # before this registration existed. Without this, activation right after
+    # registering fails (the key is issued for the new slug but validated
+    # against the old id) until the app is restarted.
+    STATION_ID = app_station_id
+    logger.info(f"Station ID set to '{app_station_id}' (was loaded before registration)")
 
     success, message, license_key = register_station(
         station_name    = station_name,
@@ -391,6 +421,104 @@ def recover_submit():
         }), 200
     else:
         return jsonify({"success": False, "error": message}), 400
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STATION ID MIGRATION — one-time fix for stations registered on v1.0.3
+# ──────────────────────────────────────────────────────────────────────────────
+# Those installs have no station_id.txt and run under the default 'te_rwizi'
+# id, with their license cryptographically bound to it. This flow rebinds
+# everything to the correct slug derived from the station's real name:
+#   1. Server reissues the license via /recover (verifies password + phone,
+#      updates machine hash + key + app_station_id in one step)
+#   2. New key is activated locally under the new slug
+#   3. station_id.txt + station YAML written, DB rows re-keyed,
+#      reports folder moved, running process updated
+# Order matters: nothing local is touched until the server + activation
+# have both succeeded, so a failure at any step leaves the app working.
+
+@app.route("/migrate_station_id", methods=["POST"])
+def migrate_station_id():
+    global STATION_ID
+
+    guard = require_login()
+    if guard:
+        return guard
+
+    data = request.get_json() or {}
+    password = data.get("password", "")
+    phone    = data.get("phone", "").strip()
+
+    station_name = session.get("station_name", "").strip()
+    old_id = STATION_ID
+    new_id = _slugify(station_name)
+
+    if not station_name:
+        return jsonify({"success": False,
+                        "error": "No station name in session — log in online first."}), 400
+    if not password or not phone:
+        return jsonify({"success": False,
+                        "error": "Password and registered phone number are required."}), 400
+    if new_id == old_id:
+        return jsonify({"success": False,
+                        "error": "Station ID already matches the station name — nothing to fix."}), 400
+
+    # 1. Server: reissue license bound to the new slug + new machine hash
+    new_machine_id = get_machine_id(new_id)
+    success, message, license_key = recover_station(
+        station_name, password, phone, new_machine_id, app_station_id=new_id
+    )
+    if not success:
+        return jsonify({"success": False, "error": message}), 400
+
+    # 2. Activate the reissued key locally under the new slug
+    if not activate_key(license_key, new_id):
+        return jsonify({"success": False,
+                        "error": "The server reissued your license but local activation "
+                                 "failed. Contact StationDeck support before retrying."}), 500
+
+    # 3. Local switchover — server + license are already consistent
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA", "")
+    data_dir = Path(_appdata) / "StationDeck"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "station_id.txt").write_text(new_id, encoding="utf-8")
+
+    # Station YAML: carry the old config's location forward
+    try:
+        old_cfg  = load_station_config(old_id)
+        location = old_cfg.get("location", "")
+        email    = (old_cfg.get("recipients") or [""])[0]
+    except Exception:
+        location, email = "", ""
+    _create_station_yaml(new_id, station_name, email, location)
+
+    # Re-key DB rows and move the reports folder
+    records_moved = migrate_station_records(old_id, new_id)
+
+    import shutil
+    old_reports = DATA_ROOT / "reports" / old_id
+    new_reports = DATA_ROOT / "reports" / new_id
+    try:
+        if old_reports.exists() and not new_reports.exists():
+            shutil.move(str(old_reports), str(new_reports))
+    except Exception as e:
+        logger.warning(f"Could not move reports folder during migration: {e}")
+
+    # Update the running process + session
+    STATION_ID = new_id
+    session["station_id"] = new_id
+    logger.info(f"Station ID migrated: {old_id} -> {new_id} ({records_moved} records)")
+
+    return jsonify({
+        "success":       True,
+        "old_id":        old_id,
+        "new_id":        new_id,
+        "records_moved": records_moved,
+        "license_key":   license_key,
+        "message":       f"Station ID fixed: {old_id} → {new_id}. "
+                         f"{records_moved} records moved. Your license was reissued "
+                         f"and activated automatically.",
+    })
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -808,15 +936,25 @@ def daily_entry_import_excel():
         if file.filename == "" or not file.filename.endswith((".xlsx", ".xls")):
             continue
 
+        # Save under the CURRENT station's configured filename so the file
+        # lands where reports/exports look for it. load_station_config
+        # resolves to an existing on-disk file first, so names stay stable
+        # for stations that already have files under legacy names.
+        try:
+            _cfg_names = {k: Path(v).name for k, v in
+                          load_station_config(STATION_ID)["files"].items()}
+        except Exception:
+            _cfg_names = {}
+
         fname = file.filename.lower()
         if "cash" in fname or "daily" in fname:
-            save_name = "Daily_cash_flow.xlsx"
+            save_name = _cfg_names.get("cashflow", "Daily_cash_flow.xlsx")
         elif "stock" in fname or "mvt" in fname or "movement" in fname:
-            save_name = "Stock mvt-Template-2025-2026-V1-7-25.xlsx"
+            save_name = _cfg_names.get("stock", "Stock_mvt.xlsx")
         elif "shop" in fname:
-            save_name = "SHOP MONTHLY SALES REPORT FOR APRIL 2026 T.E. Rwizi .xlsx"
+            save_name = _cfg_names.get("shop", "Shop_monthly_sales.xlsx")
         elif "manager" in fname or "end of" in fname:
-            save_name = "End of May manager's report.xlsx"
+            save_name = _cfg_names.get("manager", "Manager_report.xlsx")
         else:
             save_name = file.filename
 
@@ -1211,6 +1349,45 @@ def email_report():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# EXCEL EXPORT — filled Cash Flow / Stock Movement templates
+# ──────────────────────────────────────────────────────────────────────────────
+# Writes the database back into the station's own template files so the
+# downloaded workbook contains both imported and app-entered data, in the
+# exact layout the originals use (re-importable). See src/excel_export.py.
+
+@app.route("/export_excel/<kind>")
+def export_excel(kind):
+    guard = license_guard() or require_login()
+    if guard:
+        return guard
+
+    if kind not in ("cashflow", "stock"):
+        flash("Unknown export type.", "error")
+        return redirect(url_for("reports"))
+
+    try:
+        from src.excel_export import export_cashflow, export_stock
+        station_config = load_station_config(STATION_ID)
+        exports_dir    = DATA_ROOT / "data" / "exports"
+
+        if kind == "cashflow":
+            result = export_cashflow(station_config, STATION_ID, exports_dir)
+        else:
+            result = export_stock(station_config, STATION_ID, exports_dir)
+
+        if not result["success"]:
+            flash(result["message"], "error")
+            return redirect(url_for("reports"))
+
+        return send_file(str(result["path"]), as_attachment=True)
+
+    except Exception as e:
+        logger.error(f"export_excel({kind}) failed: {e}", exc_info=True)
+        flash(f"Export failed: {e}", "error")
+        return redirect(url_for("reports"))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # DOWNLOAD
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -1320,6 +1497,15 @@ def settings():
     except Exception:
         installed_version = "1.0.0"
 
+    # Station-ID migration prompt: cloud-logged-in stations whose internal id
+    # doesn't match their registered name (v1.0.3 installs stuck on te_rwizi).
+    suggested_id = _slugify(session.get("station_name", ""))
+    migration_needed = bool(
+        session.get("auth_mode") == "cloud"
+        and suggested_id
+        and suggested_id != STATION_ID
+    )
+
     return render_template(
         "settings.html",
         station_name=station_name,
@@ -1331,6 +1517,9 @@ def settings():
         software_version=installed_version,
         local_ip=local_ip,
         network_url=network_url,
+        migration_needed=migration_needed,
+        suggested_id=suggested_id,
+        current_station_id=STATION_ID,
     )
 
 

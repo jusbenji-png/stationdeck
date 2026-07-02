@@ -152,16 +152,29 @@ def _ensure_dirs():
         # All writable dirs live under DATA_DIR (%LOCALAPPDATA%\StationDeck when
         # frozen). Station YAML is read-only and ships in the install dir.
         from config.settings import DATA_DIR
+
+        # Report folders are per-station — resolve the registered station id
+        # (falls back to te_rwizi for pre-registration installs).
+        station_id = "te_rwizi"
+        try:
+            id_file = DATA_DIR / "station_id.txt"
+            if id_file.exists():
+                val = id_file.read_text(encoding="utf-8").strip()
+                if val:
+                    station_id = val
+        except Exception:
+            pass
+
         dirs = [
             DATA_DIR / "data" / "input",
             DATA_DIR / "data" / "processed",
             DATA_DIR / "data" / "ocr_temp",
             DATA_DIR / "data" / "ocr_audit",
             DATA_DIR / "logs",
-            DATA_DIR / "reports" / "te_rwizi" / "pdf",
-            DATA_DIR / "reports" / "te_rwizi" / "docx",
-            DATA_DIR / "reports" / "te_rwizi" / "xlsx",
-            DATA_DIR / "reports" / "te_rwizi" / "archive",
+            DATA_DIR / "reports" / station_id / "pdf",
+            DATA_DIR / "reports" / station_id / "docx",
+            DATA_DIR / "reports" / station_id / "xlsx",
+            DATA_DIR / "reports" / station_id / "archive",
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
@@ -225,7 +238,27 @@ def _wait_for_flask(timeout: int = TIMEOUT) -> bool:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def _already_running() -> bool:
+    """True if another StationDeck is already serving port 5000.
+
+    Windows lets two processes bind the same port (SO_REUSEADDR), which
+    silently splits traffic between two app instances with separate
+    databases. Never start a second instance — just reuse the first.
+    """
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"{LOCAL_URL}/status", timeout=2) as r:
+            return b"StationDeck" in r.read(2048) or r.status == 200
+    except Exception:
+        return False
+
+
 def main():
+    if _already_running():
+        _log("StationDeck is already running — opening browser to the existing instance.")
+        webbrowser.open(LOCAL_URL)
+        sys.exit(0)
+
     _log("=" * 50)
     _log("StationDeck launcher starting")
     _log(f"Python: {sys.version}")

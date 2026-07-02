@@ -394,6 +394,16 @@
 
     </div>
 
+    <!-- ── CLOSE APP ────────────────────────────────────────── -->
+    <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb;
+        display:flex; justify-content:flex-end;">
+        <button id="closeAppBtn" onclick="closeApp()" style="background:#f3f4f6;
+            color:#6b7280; border:1px solid #d1d5db; border-radius:6px;
+            padding:8px 16px; font-size:0.85rem; font-weight:600; cursor:pointer;">
+            Close App
+        </button>
+    </div>
+
 </div><!-- end page-wrapper -->
 
 <!-- ── SCRIPTS ───────────────────────────────────────────── -->
@@ -462,6 +472,34 @@ function checkForUpdate() {
         })
         .catch(function() {
             // Silently fail — never block the dashboard for an update check
+        });
+}
+
+// ══════════════════════════════════════════════════════════
+// CLOSE APP — fully quits the background program, not just
+// this browser tab (see /close_app route in web/app.py)
+// ══════════════════════════════════════════════════════════
+function closeApp() {
+    if (!confirm('Close StationDeck completely? You will need to reopen it from the desktop icon.')) {
+        return;
+    }
+    var btn = document.getElementById('closeAppBtn');
+    btn.disabled = true;
+    btn.textContent = 'Closing...';
+
+    fetch('/close_app', { method: 'POST' })
+        .then(function() {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;' +
+                'justify-content:center;height:100vh;font-family:sans-serif;' +
+                'color:#374151;font-size:1.1rem;">StationDeck has closed. ' +
+                'You can close this browser tab.</div>';
+        })
+        .catch(function() {
+            // The server process exits before it can respond — that's expected.
+            document.body.innerHTML = '<div style="display:flex;align-items:center;' +
+                'justify-content:center;height:100vh;font-family:sans-serif;' +
+                'color:#374151;font-size:1.1rem;">StationDeck has closed. ' +
+                'You can close this browser tab.</div>';
         });
 }
 

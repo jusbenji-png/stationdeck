@@ -24,6 +24,35 @@ DATA_INPUT_DIR = DATA_ROOT / "data" / "input"
 REPORTS_DIR = DATA_ROOT / "reports"
 
 
+# Uploaded files have been saved under different names across versions
+# (e.g. "Stock mvt-Template-2025-2026-V1-7-25.xlsx" vs "Stock_mvt.xlsx"),
+# and station YAMLs written at different times expect different ones. If the
+# configured filename isn't on disk, fall back to the newest file in
+# data/input whose name matches the file kind — so imports keep feeding
+# reports and exports regardless of which name they were saved under.
+_INPUT_FILE_PATTERNS = {
+    "cashflow": ("cash",),
+    "stock":    ("stock", "mvt", "movement"),
+    "shop":     ("shop",),
+    "manager":  ("manager",),
+}
+
+
+def _resolve_input_file(key: str, filename: str):
+    exact = DATA_INPUT_DIR / filename
+    if exact.exists():
+        return exact
+    patterns = _INPUT_FILE_PATTERNS.get(key)
+    if patterns and DATA_INPUT_DIR.exists():
+        candidates = [
+            f for f in DATA_INPUT_DIR.glob("*.xls*")
+            if any(p in f.name.lower() for p in patterns)
+        ]
+        if candidates:
+            return max(candidates, key=lambda f: f.stat().st_mtime)
+    return exact
+
+
 def load_station_config(station_id: str) -> dict:
     # Check writable user dir first (stations registered at runtime),
     # then fall back to bundled install dir (te_rwizi and pre-built configs).
@@ -50,7 +79,7 @@ def load_station_config(station_id: str) -> dict:
 
     resolved_files = {}
     for key, filename in raw["files"].items():
-        resolved_files[key] = DATA_INPUT_DIR / filename
+        resolved_files[key] = _resolve_input_file(key, filename)
 
     station_output = raw["reports"]["output_dir"]
     resolved_reports = {

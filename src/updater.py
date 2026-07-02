@@ -33,6 +33,7 @@ DESIGN DECISIONS:
 """
 
 import threading
+import time
 import requests
 import logging
 from pathlib import Path
@@ -41,6 +42,13 @@ logger = logging.getLogger(__name__)
 
 # ── Auth server URL (same server used for login verification) ─────────────────
 AUTH_SERVER = "https://web-production-46077.up.railway.app"
+
+# ── Re-check interval ────────────────────────────────────────────────────────
+# Stations often leave the app open for an entire shift. Checking only once at
+# startup means a station that was already running when a new version shipped
+# would never see the banner until it happened to restart. Re-checking
+# periodically closes that gap without polling aggressively.
+CHECK_INTERVAL_SECONDS = 4 * 60 * 60  # 4 hours
 
 # ── Module-level result store ─────────────────────────────────────────────────
 # This dictionary is written by the background thread and read by Flask routes.
@@ -187,15 +195,23 @@ def _do_check():
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def _check_loop():
+    """Run _do_check() immediately, then again every CHECK_INTERVAL_SECONDS."""
+    while True:
+        _do_check()
+        time.sleep(CHECK_INTERVAL_SECONDS)
+
+
 def start_update_check():
     """
     Launch the update check in a background daemon thread.
 
     Call this once from launcher.py after Flask starts.
-    It returns immediately — the check runs in the background.
-    The result appears in _update_status within a few seconds.
+    It returns immediately — the first check completes within a few seconds,
+    then repeats every CHECK_INTERVAL_SECONDS for as long as the app runs, so
+    a station that leaves StationDeck open still sees new-version banners.
     """
-    thread = threading.Thread(target=_do_check, daemon=True, name="UpdateChecker")
+    thread = threading.Thread(target=_check_loop, daemon=True, name="UpdateChecker")
     thread.start()
     logger.info("Update check started in background.")
 

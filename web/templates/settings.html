@@ -111,6 +111,85 @@
         </div>
     </div>
 
+    {% if migration_needed %}
+    <!-- ── STATION ID FIX (one-time migration) ─────────────────────── -->
+    <div class="settings-section" id="migration-card">
+        <h2 class="settings-heading">
+            <span class="settings-icon">🔧</span> Fix Station ID
+        </h2>
+        <div class="settings-card">
+            <p class="settings-note">
+                Your station is registered as <strong>{{ station_name }}</strong>, but this
+                installation is still using the internal ID
+                <code>{{ current_station_id }}</code>. Fixing this renames it to
+                <code>{{ suggested_id }}</code> so your reports, data, and license are
+                stored under your own station's identity.
+            </p>
+            <p class="settings-note" style="color:#92400e;">
+                Your license will be reissued and re-activated automatically — you'll
+                need your <strong>login password</strong> and the <strong>phone number you
+                registered with</strong>. Your data is kept; nothing is deleted.
+            </p>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0;">
+                <input type="password" id="migratePassword" placeholder="Login password"
+                       style="padding:9px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:0.88rem;">
+                <input type="text" id="migratePhone" placeholder="Registered phone (e.g. 0760910726)"
+                       style="padding:9px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:0.88rem;">
+            </div>
+            <button id="migrateBtn" onclick="runMigration()"
+                    style="background:#C8102E; color:#fff; border:none; border-radius:6px;
+                           padding:10px 20px; font-size:0.88rem; font-weight:700; cursor:pointer;">
+                Fix Station ID Now
+            </button>
+            <div id="migrateResult" style="margin-top:12px; font-size:0.86rem;"></div>
+        </div>
+    </div>
+
+    <script>
+    function runMigration() {
+        var pw    = document.getElementById('migratePassword').value;
+        var phone = document.getElementById('migratePhone').value.trim();
+        var out   = document.getElementById('migrateResult');
+        var btn   = document.getElementById('migrateBtn');
+
+        if (!pw || !phone) {
+            out.style.color = '#b91c1c';
+            out.textContent = 'Enter both your password and registered phone number.';
+            return;
+        }
+        if (!confirm('Fix the station ID now? Your license will be reissued — this takes a few seconds.')) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Fixing…';
+
+        fetch('/migrate_station_id', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: pw, phone: phone })
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.success) {
+                out.style.color = '#166534';
+                out.innerHTML = '✓ ' + d.message + '<br>Reloading…';
+                setTimeout(function(){ window.location.reload(); }, 2500);
+            } else {
+                out.style.color = '#b91c1c';
+                out.textContent = d.error || 'Migration failed.';
+                btn.disabled = false;
+                btn.textContent = 'Fix Station ID Now';
+            }
+        })
+        .catch(function(){
+            out.style.color = '#b91c1c';
+            out.textContent = 'Could not reach the app. Try again.';
+            btn.disabled = false;
+            btn.textContent = 'Fix Station ID Now';
+        });
+    }
+    </script>
+    {% endif %}
+
     <!-- ── CAPTURE TEMPLATES ───────────────────────────────────────── -->
     <div class="settings-section">
         <h2 class="settings-heading">
