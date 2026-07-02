@@ -11,37 +11,66 @@
 #   BOTH previously-imported and app-entered data, in the exact layout
 #   TotalEnergies expects, and can be re-imported into StationDeck.
 #
-# DESIGN RULES (data safety first):
-#   1. The master file in data/input/ is NEVER modified. We copy it to
-#      data/exports/ and fill the copy.
-#   2. Rows that already contain data in the master are left 100%
-#      untouched — the master was the import source, so it wins.
+# HOW (surgical zip editing — NOT load/re-save):
+#   Re-saving a workbook with openpyxl rebuilds every part of the file
+#   and silently drops what it can't model: embedded charts, cached
+#   formula results, zero-width (hidden) columns. Instead, the export
+#   copies every zip member of the original byte-for-byte and rewrites
+#   ONLY the worksheet XML of sheets that receive new data. Formulas,
+#   charts, styles, hidden columns — everything else is untouched by
+#   construction.
+#
+# DATA-SAFETY RULES:
+#   1. The master file in data/input/ is never modified — the export is
+#      written to data/exports/ under a unique per-request name.
+#   2. Rows that already contain data in the master are left byte-perfect.
 #      Only rows that are EMPTY in the master but present in the DB
 #      (i.e. app-entered days) are filled.
-#   3. Formula cells are preserved wherever possible. On rows we fill,
-#      computed cells are written as plain values (openpyxl cannot
-#      recalculate), and fullCalcOnLoad is set so Excel refreshes the
-#      monthly SUM/subtotal formulas the first time the file is opened.
+#   3. Filled computed cells keep their formulas — the DB value is written
+#      as the cached result, and fullCalcOnLoad makes Excel refresh all
+#      totals the first time the file is opened.
 #
 # WHAT EACH EXPORT CAN FILL:
 #   Cash Flow      — every column (the DB stores the full row).
-#   Stock Movement — Daily Expenses (11 of 14 categories) and the
-#                    manual columns of General Sales Sumary (Lubricants,
-#                    TBA, LPG). Fuel dips/purchases and the Shop Sales
+#   Stock Movement — Daily Expenses (11 of 14 categories) and the manual
+#                    columns of General Sales Sumary (Lubricants, TBA,
+#                    LPG). Fuel dips/purchases and the Shop Sales
 #                    day/night split are physical readings the app does
 #                    not persist, so those stay as they were imported.
 # =============================================================
 
 import logging
+import re
 import shutil
+import zipfile
 from datetime import datetime, date
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import openpyxl
+from openpyxl.utils import get_column_letter
 
 from src.database import get_records_by_date_range
 
 logger = logging.getLogger(__name__)
+
+_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+# Register every namespace prefix the station templates use, so rewriting a
+# worksheet keeps the exact prefixes Excel/WPS expect (ElementTree would
+# otherwise invent ns0-style prefixes, which breaks mc:Ignorable references).
+for _prefix, _uri in {
+    "":     _NS,
+    "r":    _R_NS,
+    "xdr":  "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+    "x14":  "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+    "x14ac": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac",
+    "mc":   "http://schemas.openxmlformats.org/markup-compatibility/2006",
+    "etc":  "http://www.wps.cn/officeDocument/2017/etCustomData",
+    "xr":   "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
+}.items():
+    ET.register_namespace(_prefix, _uri)
 
 
 # ── Cash Flow: DB column → 1-based Excel column on 'CASH FLOW' sheet ─────────
@@ -85,9 +114,8 @@ CASHFLOW_INPUT_COLS = {
     "actual_cash_banked":      44,  # AR
 }
 
-# Computed columns — normally Excel formulas. Written as plain values on
-# rows WE fill (the DB already holds the computed results), so the file is
-# correct immediately and on re-import into StationDeck.
+# Computed columns: their formulas stay in place; the DB value is written as
+# the cached result so the row is correct immediately and on re-import.
 CASHFLOW_COMPUTED_COLS = {
     "pms_revenue":    6,   # F  (=B*D)
     "ago_revenue":    7,   # G  (=C*E)
@@ -98,13 +126,9 @@ CASHFLOW_COMPUTED_COLS = {
     "delta":          45,  # AS
 }
 
-# Cells checked to decide whether a master row already has data.
 _CASHFLOW_PRESENCE_COLS = (2, 3, 25)   # B pms_vol, C ago_vol, Y total_cash
 
-
-# ── Stock Movement: 'Daily Expenses' sheet — DB col → 1-based Excel col ─────
-# Mirrors EXPENSE_COLS in src/reader_stock.py. NSSF / Maintenance / VAT are
-# captured on paper but not stored per-category in the DB → left blank.
+# ── Stock Movement: 'Daily Expenses' — DB col → 1-based Excel col ───────────
 STOCK_EXPENSE_COLS = {
     "expense_meals":       2,   # B  Meals
     "expense_generator":   3,   # C  Generator
@@ -118,6 +142,7 @@ STOCK_EXPENSE_COLS = {
     "expense_transport":   11,  # K  Transport
     "expense_misc":        13,  # M  Sundries
 }
+STOCK_EXPENSE_TOTAL_COL = 32    # AF — per-row =SUM formula; DB total cached
 
 # 'General Sales Sumary' — only its truly manual columns. PMS/AGO (B/C) and
 # Shop (J) are cross-sheet formulas and must not be overwritten.
@@ -129,51 +154,23 @@ STOCK_GENERAL_SALES_COLS = {
 
 
 # ─────────────────────────────────────────────────────────────
-# Helpers
+# Planning helpers (read-only openpyxl)
 # ─────────────────────────────────────────────────────────────
 
 def _all_db_records(station_id: str):
-    """Every daily record for the station, as {date_str: row_dict}."""
     df = get_records_by_date_range("2000-01-01", "2100-01-01", station_id)
     records = {}
     if df is None or df.empty:
         return records
     for _, row in df.iterrows():
-        d = str(row["date"])[:10]
-        records[d] = row.to_dict()
+        records[str(row["date"])[:10]] = row.to_dict()
     return records
 
 
 def _date_key(value):
-    """Normalize an Excel cell value to 'YYYY-MM-DD' or None."""
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d")
-    if isinstance(value, date):
-        return value.strftime("%Y-%m-%d")
+    if isinstance(value, (datetime, date)):
+        return f"{value:%Y-%m-%d}"
     return None
-
-
-def _build_date_index(ws_vals):
-    """Map date -> row number using the CACHED values of column A.
-
-    Templates chain dates with formulas (=+A2+1), so the formula view of
-    the sheet can't be used — this must come from a data_only load.
-    """
-    index = {}
-    for row in range(2, ws_vals.max_row + 1):
-        key = _date_key(ws_vals.cell(row=row, column=1).value)
-        if key and key not in index:
-            index[key] = row
-    return index
-
-
-def _row_is_empty(ws_vals, row, presence_cols):
-    """True when none of the presence cells hold a non-zero cached value."""
-    for col in presence_cols:
-        v = ws_vals.cell(row=row, column=col).value
-        if isinstance(v, (int, float)) and v != 0:
-            return False
-    return True
 
 
 def _num(record, key):
@@ -187,55 +184,11 @@ def _num(record, key):
     return int(f) if f == int(f) else round(f, 2)
 
 
-def _bake_row(ws, ws_vals, row, max_col):
-    """Replace this row's formula cells with their Excel-cached values.
-
-    openpyxl saves formulas WITHOUT their cached results, so a re-read of
-    the saved file (pandas/StationDeck import) would see those cells as
-    empty. Baking the cached values into data rows keeps the export
-    readable everywhere. Rows without data keep their formulas so managers
-    can continue filling the sheet by hand in Excel.
-    """
-    for col in range(1, max_col + 1):
-        cell = ws.cell(row=row, column=col)
-        if isinstance(cell.value, str) and cell.value.startswith("="):
-            cached = ws_vals.cell(row=row, column=col).value
-            if cached is not None:
-                cell.value = cached
-
-
-def _row_has_any_value(ws_vals, row, max_col):
-    """True if any cached cell beyond the date column holds a non-zero number."""
-    for col in range(2, max_col + 1):
-        v = ws_vals.cell(row=row, column=col).value
-        if isinstance(v, (int, float)) and v != 0:
-            return True
-    return False
-
-
-def _bake_data_rows(ws, ws_vals, max_col, extra_rows=frozenset()):
-    """Bake cached formula results into every dated row that holds data.
-
-    Walks ALL rows (templates can carry duplicate dates — stray partial
-    rows next to the real one — and a first-match date index would miss
-    the real row). Rows without data keep their formulas so the sheet
-    stays hand-fillable; `extra_rows` forces rows we filled from the DB.
-    """
-    for row in range(2, ws_vals.max_row + 1):
-        if _date_key(ws_vals.cell(row=row, column=1).value) is None:
-            continue
-        if row in extra_rows or _row_has_any_value(ws_vals, row, max_col):
-            _bake_row(ws, ws_vals, row, max_col)
-
-
 def _export_path(exports_dir: Path, label: str) -> Path:
-    """Unique on-disk name per request. Two concurrent exports (double-click,
-    browser link-preload) previously shared one date-stamped path — one
-    request overwrote the file while the other was still parsing it,
-    corrupting both. The download keeps a clean name via send_file's
-    download_name; old files are pruned so the folder stays small."""
+    """Unique on-disk name per request. Concurrent exports (double-click,
+    browser link-preload) must never share a path — one request overwriting
+    the file mid-read corrupts both. Old exports are pruned after 7 days."""
     exports_dir.mkdir(parents=True, exist_ok=True)
-
     cutoff = datetime.now().timestamp() - 7 * 24 * 3600
     for old in exports_dir.glob("StationDeck_Export_*.xlsx"):
         try:
@@ -243,7 +196,6 @@ def _export_path(exports_dir: Path, label: str) -> Path:
                 old.unlink()
         except Exception:
             pass
-
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S_%f")
     return exports_dir / f"StationDeck_Export_{label}_{stamp}.xlsx"
 
@@ -253,83 +205,226 @@ def download_name(label: str) -> str:
     return f"StationDeck_Export_{label}_{datetime.now():%Y-%m-%d}.xlsx"
 
 
+class _SheetPlan:
+    """Read one worksheet (cached values) and decide which cells to fill."""
+
+    def __init__(self, ws_vals):
+        self.ws = ws_vals
+        self.date_rows = {}           # 'YYYY-MM-DD' -> first row number
+        for row in range(2, ws_vals.max_row + 1):
+            key = _date_key(ws_vals.cell(row=row, column=1).value)
+            if key and key not in self.date_rows:
+                self.date_rows[key] = row
+
+    def row_has_any_value(self, row, max_col):
+        for col in range(2, max_col + 1):
+            v = self.ws.cell(row=row, column=col).value
+            if isinstance(v, (int, float)) and v != 0:
+                return True
+        return False
+
+    def row_is_empty(self, row, presence_cols):
+        for col in presence_cols:
+            v = self.ws.cell(row=row, column=col).value
+            if isinstance(v, (int, float)) and v != 0:
+                return False
+        return True
+
+
+# ─────────────────────────────────────────────────────────────
+# Surgical zip writer
+# ─────────────────────────────────────────────────────────────
+
+def _sheet_part_paths(zf: zipfile.ZipFile) -> dict:
+    """Map sheet name -> zip member path (e.g. 'xl/worksheets/sheet6.xml')."""
+    wb_xml = zf.read("xl/workbook.xml")
+    rels_xml = zf.read("xl/_rels/workbook.xml.rels")
+    rid_to_target = {}
+    for rel in ET.fromstring(rels_xml):
+        rid_to_target[rel.get("Id")] = rel.get("Target")
+    result = {}
+    root = ET.fromstring(wb_xml)
+    for sheet in root.iter(f"{{{_NS}}}sheet"):
+        rid = sheet.get(f"{{{_R_NS}}}id")
+        target = rid_to_target.get(rid, "")
+        if target:
+            if not target.startswith("xl/"):
+                target = "xl/" + target.lstrip("/")
+            result[sheet.get("name")] = target
+    return result
+
+
+def _fmt_num(v) -> str:
+    if isinstance(v, float) and v == int(v):
+        v = int(v)
+    return repr(v)
+
+
+def _apply_edits_to_sheet_xml(xml_bytes: bytes, edits: dict) -> bytes:
+    """Set cell values in a worksheet XML. edits: {(row:int, col:int): number}
+
+    Existing cells keep their style and formula (the new value becomes the
+    cached result). Missing cells are created in correct column order,
+    borrowing the style of the same column one row above when available.
+    """
+    root = ET.fromstring(xml_bytes)
+    sheet_data = root.find(f"{{{_NS}}}sheetData")
+    if sheet_data is None:
+        return xml_bytes
+
+    by_row = {}
+    for r, c in edits:
+        by_row.setdefault(r, {})[c] = edits[(r, c)]
+
+    rows_index = {int(el.get("r")): el for el in sheet_data if el.get("r")}
+
+    def _col_of(cell_el):
+        ref = cell_el.get("r") or ""
+        letters = "".join(ch for ch in ref if ch.isalpha())
+        n = 0
+        for ch in letters:
+            n = n * 26 + (ord(ch) - 64)
+        return n
+
+    for row_no, cols in sorted(by_row.items()):
+        row_el = rows_index.get(row_no)
+        if row_el is None:
+            row_el = ET.SubElement(sheet_data, f"{{{_NS}}}row", {"r": str(row_no)})
+            rows_index[row_no] = row_el
+
+        cells = {_col_of(c): c for c in row_el.findall(f"{{{_NS}}}c")}
+
+        for col_no, value in sorted(cols.items()):
+            ref = f"{get_column_letter(col_no)}{row_no}"
+            cell = cells.get(col_no)
+            if cell is None:
+                cell = ET.Element(f"{{{_NS}}}c", {"r": ref})
+                prev = rows_index.get(row_no - 1)
+                if prev is not None:
+                    for pc in prev.findall(f"{{{_NS}}}c"):
+                        if _col_of(pc) == col_no and pc.get("s"):
+                            cell.set("s", pc.get("s"))
+                            break
+                pos = len(list(row_el))
+                for i, existing in enumerate(row_el):
+                    if _col_of(existing) > col_no:
+                        pos = i
+                        break
+                row_el.insert(pos, cell)
+                cells[col_no] = cell
+
+            # Numeric value: drop any string typing / inline string content,
+            # keep formulas (Excel recalculates; our value is the cache).
+            if cell.get("t"):
+                del cell.attrib["t"]
+            for child in cell.findall(f"{{{_NS}}}is"):
+                cell.remove(child)
+            v_el = cell.find(f"{{{_NS}}}v")
+            if v_el is None:
+                v_el = ET.SubElement(cell, f"{{{_NS}}}v")
+            v_el.text = _fmt_num(value)
+
+    return ET.tostring(root, encoding="UTF-8", xml_declaration=True)
+
+
+def _set_full_calc(workbook_xml: bytes) -> bytes:
+    """Ask Excel to recalculate everything on first open, so SUM totals
+    pick up the newly filled rows."""
+    text = workbook_xml.decode("utf-8")
+    if "fullCalcOnLoad" in text:
+        return workbook_xml
+    new, n = re.subn(r"<calcPr ", '<calcPr fullCalcOnLoad="1" ', text, count=1)
+    if n == 0:
+        new, n = re.subn(r"(</workbook>)",
+                         '<calcPr fullCalcOnLoad="1"/>\\1', text, count=1)
+    return new.encode("utf-8")
+
+
+def _write_export(src: Path, out: Path, sheet_edits: dict) -> None:
+    """Copy src → out, rewriting only edited sheets (+ calc flag).
+
+    sheet_edits: {sheet_name: {(row, col): value}}
+    """
+    with zipfile.ZipFile(src) as zin:
+        part_for_sheet = _sheet_part_paths(zin)
+        edited_parts = {}
+        for sheet_name, edits in sheet_edits.items():
+            if not edits:
+                continue
+            part = part_for_sheet.get(sheet_name)
+            if not part:
+                logger.warning(f"export: no part found for sheet {sheet_name!r}")
+                continue
+            edited_parts[part] = _apply_edits_to_sheet_xml(zin.read(part), edits)
+
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename in edited_parts:
+                    data = edited_parts[item.filename]
+                elif item.filename == "xl/workbook.xml" and edited_parts:
+                    data = _set_full_calc(data)
+                zout.writestr(item, data)
+
+
 # ─────────────────────────────────────────────────────────────
 # EXPORT 1 — DAILY CASH FLOW
 # ─────────────────────────────────────────────────────────────
 
 def export_cashflow(station_config: dict, station_id: str,
                     exports_dir: Path) -> dict:
-    """Fill the station's cash-flow template with all DB data.
-
-    Returns {"success", "path", "rows_filled", "message"}.
-    """
     src = Path(station_config["files"]["cashflow"])
     if not src.exists():
         return {"success": False, "path": None, "rows_filled": 0,
                 "message": "No cash flow file has been imported yet — "
                            "import one first so StationDeck has the template."}
 
-    out = _export_path(exports_dir, "Daily_Cash_Flow")
-    shutil.copy2(src, out)
-
     records = _all_db_records(station_id)
     if not records:
         return {"success": False, "path": None, "rows_filled": 0,
                 "message": "The database has no records to export."}
 
-    wb_vals = openpyxl.load_workbook(out, data_only=True)
-    wb      = openpyxl.load_workbook(out)
-
+    wb_vals = openpyxl.load_workbook(src, data_only=True)
     skip = {"Sheet1", "Sheet2", "Sheet3", "Chart1"}
+    sheet_edits = {}
     rows_filled = 0
 
-    for sheet_name in wb.sheetnames:
-        if sheet_name in skip or sheet_name not in wb_vals.sheetnames:
+    for sheet_name in wb_vals.sheetnames:
+        if sheet_name in skip:
             continue
-        ws_vals = wb_vals[sheet_name]
-        ws      = wb[sheet_name]
-        index   = _build_date_index(ws_vals)
-        if not index:
+        plan = _SheetPlan(wb_vals[sheet_name])
+        if not plan.date_rows:
             continue
-
-        max_col = max(CASHFLOW_COMPUTED_COLS.values())
-        filled  = set()
-
-        for date_str, row_no in index.items():
+        edits = {}
+        for date_str, row_no in plan.date_rows.items():
             record = records.get(date_str)
             if record is None:
                 continue
             # Master rows that already hold data are the import source —
             # never overwrite them.
-            if not _row_is_empty(ws_vals, row_no, _CASHFLOW_PRESENCE_COLS):
+            if not plan.row_is_empty(row_no, _CASHFLOW_PRESENCE_COLS):
                 continue
-
             wrote = False
             for db_col, xl_col in CASHFLOW_INPUT_COLS.items():
                 v = _num(record, db_col)
                 if v is not None:
-                    ws.cell(row=row_no, column=xl_col).value = v
+                    edits[(row_no, xl_col)] = v
                     wrote = True
             if wrote:
-                # Replace this row's formulas with the DB's computed values
-                # so the row is correct immediately (openpyxl can't recalc).
                 for db_col, xl_col in CASHFLOW_COMPUTED_COLS.items():
                     v = _num(record, db_col)
                     if v is not None:
-                        ws.cell(row=row_no, column=xl_col).value = v
-                filled.add(row_no)
+                        edits[(row_no, xl_col)] = v
                 rows_filled += 1
-
-        # Bake Excel's cached formula results into every data row —
-        # openpyxl drops them on save, which would otherwise make the
-        # whole file unreadable on re-import. Walks all rows, so stray
-        # duplicate-date rows are baked too.
-        _bake_data_rows(ws, ws_vals, max_col, extra_rows=filled)
-
-    wb.calculation.fullCalcOnLoad = True   # refresh SUM totals in Excel
-    wb.save(out)
-    wb.close()
+        if edits:
+            sheet_edits[sheet_name] = edits
     wb_vals.close()
+
+    out = _export_path(exports_dir, "Daily_Cash_Flow")
+    if sheet_edits:
+        _write_export(src, out, sheet_edits)
+    else:
+        shutil.copy2(src, out)   # nothing to add — perfect copy
 
     logger.info(f"export_cashflow: {rows_filled} app-entered day(s) "
                 f"written into {out.name}")
@@ -344,99 +439,72 @@ def export_cashflow(station_config: dict, station_id: str,
 
 def export_stock(station_config: dict, station_id: str,
                  exports_dir: Path) -> dict:
-    """Fill the stock-movement template's Daily Expenses and General Sales
-    manual columns from the DB. Fuel dips/purchases stay as imported —
-    the app never persists physical tank readings."""
     src = Path(station_config["files"]["stock"])
     if not src.exists():
         return {"success": False, "path": None, "rows_filled": 0,
                 "message": "No stock movement file has been imported yet — "
                            "import one first so StationDeck has the template."}
 
-    out = _export_path(exports_dir, "Stock_Movement")
-    shutil.copy2(src, out)
-
     records = _all_db_records(station_id)
     if not records:
         return {"success": False, "path": None, "rows_filled": 0,
                 "message": "The database has no records to export."}
 
-    wb_vals = openpyxl.load_workbook(out, data_only=True)
-    wb      = openpyxl.load_workbook(out)
-
+    wb_vals = openpyxl.load_workbook(src, data_only=True)
+    sheet_edits = {}
     rows_filled = 0
-    filled_rows = set()   # (sheet_name, row_no) written from the DB
 
     # ── Daily Expenses ────────────────────────────────────────
-    if "Daily Expenses" in wb.sheetnames:
-        ws_vals = wb_vals["Daily Expenses"]
-        ws      = wb["Daily Expenses"]
-        for date_str, row_no in _build_date_index(ws_vals).items():
+    if "Daily Expenses" in wb_vals.sheetnames:
+        plan = _SheetPlan(wb_vals["Daily Expenses"])
+        edits = {}
+        for date_str, row_no in plan.date_rows.items():
             record = records.get(date_str)
             if record is None:
                 continue
             # Fill ONLY rows that are empty across the ENTIRE row — the
             # sheet has categories beyond what the DB stores (NSSF, VAT,
             # maintenance, cols 15-31), and any of them counts as data.
-            if _row_has_any_value(ws_vals, row_no, 32):
+            if plan.row_has_any_value(row_no, STOCK_EXPENSE_TOTAL_COL):
                 continue
             wrote = False
             for db_col, xl_col in STOCK_EXPENSE_COLS.items():
                 v = _num(record, db_col)
                 if v:   # expenses: only write non-zero, keep sheet sparse
-                    ws.cell(row=row_no, column=xl_col).value = v
+                    edits[(row_no, xl_col)] = v
                     wrote = True
             if wrote:
-                # The TOTAL column (AF) is a per-row formula openpyxl can't
-                # recalculate — write the DB total so re-import reads it.
                 v = _num(record, "total_expenses")
                 if v:
-                    ws.cell(row=row_no, column=32).value = v
-                filled_rows.add(("Daily Expenses", row_no))
+                    edits[(row_no, STOCK_EXPENSE_TOTAL_COL)] = v
                 rows_filled += 1
+        if edits:
+            sheet_edits["Daily Expenses"] = edits
 
     # ── General Sales Sumary (manual columns only) ────────────
-    if "General Sales Sumary" in wb.sheetnames:
-        ws_vals = wb_vals["General Sales Sumary"]
-        ws      = wb["General Sales Sumary"]
+    if "General Sales Sumary" in wb_vals.sheetnames:
+        plan = _SheetPlan(wb_vals["General Sales Sumary"])
         presence = tuple(STOCK_GENERAL_SALES_COLS.values())
-        for date_str, row_no in _build_date_index(ws_vals).items():
+        edits = {}
+        for date_str, row_no in plan.date_rows.items():
             record = records.get(date_str)
             if record is None:
                 continue
-            if not _row_is_empty(ws_vals, row_no, presence):
+            if not plan.row_is_empty(row_no, presence):
                 continue
-            wrote = False
             for db_col, xl_col in STOCK_GENERAL_SALES_COLS.items():
                 v = _num(record, db_col)
                 if v:
-                    ws.cell(row=row_no, column=xl_col).value = v
-                    wrote = True
-            if wrote:
-                filled_rows.add(("General Sales Sumary", row_no))
-
-    # ── Bake cached formula results into all data rows ────────
-    # StationDeck's readers consume formula columns on these sheets
-    # (fuel turnover, cross-sheet revenue, per-row totals). openpyxl
-    # drops Excel's cached results on save, so without this the export
-    # would re-import as empty. Rows without data keep their formulas.
-    # Rows we just filled are also baked so their formula-chained date
-    # cells become real dates the readers can recognize.
-    _READER_SHEETS = [s for s in wb.sheetnames
-                      if s.startswith("Fuel Mvt") or s in
-                      ("Fuel Sales Sumary", "General Sales Sumary",
-                       "Shop Sales", "Daily Expenses")]
-    for sheet_name in _READER_SHEETS:
-        ws_vals = wb_vals[sheet_name]
-        ws      = wb[sheet_name]
-        max_col = min(ws.max_column, 40)
-        extra   = {r for (s, r) in filled_rows if s == sheet_name}
-        _bake_data_rows(ws, ws_vals, max_col, extra_rows=extra)
-
-    wb.calculation.fullCalcOnLoad = True
-    wb.save(out)
-    wb.close()
+                    edits[(row_no, xl_col)] = v
+        if edits:
+            sheet_edits["General Sales Sumary"] = edits
     wb_vals.close()
+
+    out = _export_path(exports_dir, "Stock_Movement")
+    if sheet_edits:
+        _write_export(src, out, sheet_edits)
+    else:
+        shutil.copy2(src, out)
 
     logger.info(f"export_stock: {rows_filled} expense day(s) "
                 f"written into {out.name}")
