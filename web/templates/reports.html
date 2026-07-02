@@ -21,19 +21,60 @@
             the originals, so they can be shared or re-imported directly.
         </p>
         <div style="display:flex; gap:12px; flex-wrap:wrap;">
-            <a href="{{ url_for('export_excel', kind='cashflow') }}"
-               class="btn btn-outline btn-sm" style="font-weight:600;">
+            <button id="exp-cashflow" onclick="runExport('cashflow', this)"
+               class="btn btn-outline btn-sm" style="font-weight:600; cursor:pointer;">
                 📊 Daily Cash Flow (filled)
-            </a>
-            <a href="{{ url_for('export_excel', kind='stock') }}"
-               class="btn btn-outline btn-sm" style="font-weight:600;">
+            </button>
+            <button id="exp-stock" onclick="runExport('stock', this)"
+               class="btn btn-outline btn-sm" style="font-weight:600; cursor:pointer;">
                 🛢 Stock Movement (filled)
-            </a>
+            </button>
         </div>
+        <div id="export-status" style="margin-top:10px; font-size:0.82rem;
+             color:#6b7280; display:none;"></div>
         <div style="margin-top:10px; font-size:0.78rem; color:#9ca3af;">
             Cash flow exports every column. Stock movement fills daily expenses and
             product sales — tank dips stay as imported (physical readings).
+            Large files take up to a minute to prepare.
         </div>
+        <script>
+        function runExport(kind, btn) {
+            var other  = document.getElementById(kind === 'stock' ? 'exp-cashflow' : 'exp-stock');
+            var status = document.getElementById('export-status');
+            var orig   = btn.textContent;
+            btn.disabled = true; other.disabled = true;
+            btn.textContent = '⏳ Preparing… please wait';
+            status.style.display = 'block';
+            status.style.color = '#6b7280';
+            status.textContent = 'Filling your template with all StationDeck data — this can take up to a minute for large files.';
+
+            fetch('/export_excel/' + kind, { method: 'POST' })
+                .then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    var ct = r.headers.get('Content-Type') || '';
+                    if (ct.indexOf('spreadsheet') === -1) throw new Error('export failed on the server');
+                    var cd = r.headers.get('Content-Disposition') || '';
+                    var m  = cd.match(/filename="?([^";]+)/);
+                    return r.blob().then(function(b) { return { blob: b, name: m ? m[1] : 'StationDeck_Export.xlsx' }; });
+                })
+                .then(function(d) {
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(d.blob);
+                    a.download = d.name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    status.style.color = '#166534';
+                    status.textContent = '✓ Export ready — check your Downloads folder (' + d.name + ').';
+                })
+                .catch(function(e) {
+                    status.style.color = '#b91c1c';
+                    status.textContent = 'Export failed: ' + e.message + '. Try again — if it keeps failing, check logs\\app.log.';
+                })
+                .finally(function() {
+                    btn.disabled = false; other.disabled = false;
+                    btn.textContent = orig;
+                });
+        }
+        </script>
     </div>
 
     <div class="card">

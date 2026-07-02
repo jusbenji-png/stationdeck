@@ -229,9 +229,28 @@ def _bake_data_rows(ws, ws_vals, max_col, extra_rows=frozenset()):
 
 
 def _export_path(exports_dir: Path, label: str) -> Path:
+    """Unique on-disk name per request. Two concurrent exports (double-click,
+    browser link-preload) previously shared one date-stamped path — one
+    request overwrote the file while the other was still parsing it,
+    corrupting both. The download keeps a clean name via send_file's
+    download_name; old files are pruned so the folder stays small."""
     exports_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y-%m-%d")
+
+    cutoff = datetime.now().timestamp() - 7 * 24 * 3600
+    for old in exports_dir.glob("StationDeck_Export_*.xlsx"):
+        try:
+            if old.stat().st_mtime < cutoff:
+                old.unlink()
+        except Exception:
+            pass
+
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S_%f")
     return exports_dir / f"StationDeck_Export_{label}_{stamp}.xlsx"
+
+
+def download_name(label: str) -> str:
+    """Clean, date-stamped filename shown to the user."""
+    return f"StationDeck_Export_{label}_{datetime.now():%Y-%m-%d}.xlsx"
 
 
 # ─────────────────────────────────────────────────────────────

@@ -99,8 +99,24 @@ app = Flask(__name__,
 app.secret_key = os.environ.get("FLASK_SECRET", "stationdeck-dev-secret-2026")
 
 # ── Logging ───────────────────────────────────────────────────────────────────
+# In the frozen exe stdout/stderr are discarded, so console-only logging means
+# every error disappears. Always mirror WARNING+ to a rotating file under the
+# writable data root so failures at stations can actually be diagnosed.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from logging.handlers import RotatingFileHandler
+    _log_dir = DATA_ROOT / "logs"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _fh = RotatingFileHandler(_log_dir / "app.log", maxBytes=1_000_000,
+                              backupCount=3, encoding="utf-8")
+    _fh.setLevel(logging.WARNING)
+    _fh.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(_fh)
+except Exception:
+    pass
 
 # ── Station config ────────────────────────────────────────────────────────────
 def _slugify(name: str) -> str:
@@ -1355,7 +1371,13 @@ def email_report():
 # downloaded workbook contains both imported and app-entered data, in the
 # exact layout the originals use (re-importable). See src/excel_export.py.
 
-@app.route("/export_excel/<kind>")
+# Serialize export generation: each run reads multi-MB workbooks for up to a
+# minute, and concurrent runs (double-click, browser link-preload) previously
+# corrupted each other's output files.
+_export_lock = __import__("threading").Lock()
+
+
+@app.route("/export_excel/<kind>", methods=["GET", "POST"])
 def export_excel(kind):
     guard = license_guard() or require_login()
     if guard:
@@ -1366,20 +1388,24 @@ def export_excel(kind):
         return redirect(url_for("reports"))
 
     try:
-        from src.excel_export import export_cashflow, export_stock
+        from src.excel_export import export_cashflow, export_stock, download_name
         station_config = load_station_config(STATION_ID)
         exports_dir    = DATA_ROOT / "data" / "exports"
 
-        if kind == "cashflow":
-            result = export_cashflow(station_config, STATION_ID, exports_dir)
-        else:
-            result = export_stock(station_config, STATION_ID, exports_dir)
+        with _export_lock:
+            if kind == "cashflow":
+                result = export_cashflow(station_config, STATION_ID, exports_dir)
+                dl_name = download_name("Daily_Cash_Flow")
+            else:
+                result = export_stock(station_config, STATION_ID, exports_dir)
+                dl_name = download_name("Stock_Movement")
 
         if not result["success"]:
             flash(result["message"], "error")
             return redirect(url_for("reports"))
 
-        return send_file(str(result["path"]), as_attachment=True)
+        return send_file(str(result["path"]), as_attachment=True,
+                         download_name=dl_name)
 
     except Exception as e:
         logger.error(f"export_excel({kind}) failed: {e}", exc_info=True)
@@ -1506,6 +1532,12 @@ def settings():
         and suggested_id != STATION_ID
     )
 
+    try:
+        from src.backup import last_backup_date
+        last_backup = last_backup_date(DATA_ROOT)
+    except Exception:
+        last_backup = None
+
     return render_template(
         "settings.html",
         station_name=station_name,
@@ -1520,6 +1552,8 @@ def settings():
         migration_needed=migration_needed,
         suggested_id=suggested_id,
         current_station_id=STATION_ID,
+        last_backup=last_backup,
+        backups_path=str(DATA_ROOT / "backups"),
     )
 
 

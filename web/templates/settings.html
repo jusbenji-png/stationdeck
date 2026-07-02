@@ -259,12 +259,23 @@
             <span class="settings-icon">💾</span> Data Backup
         </h2>
         <div class="settings-card">
+            <div style="background:#f0f7f4; border:1px solid #b8ddd0; border-radius:8px;
+                        padding:12px 16px; margin-bottom:12px; font-size:0.87rem; color:#1f4d3d;">
+                ✅ <strong>Automatic backup is ON.</strong> StationDeck saves a copy of your
+                database and imported files every week to
+                <code style="word-break:break-all;">{{ backups_path }}</code>
+                (the newest 8 are kept).
+                {% if last_backup %}
+                    Last backup: <strong>{{ last_backup.strftime('%d %b %Y') }}</strong>.
+                {% else %}
+                    The first backup will be created shortly after startup.
+                {% endif %}
+            </div>
             <div class="backup-warning">
-                ⚠️ <strong>Important:</strong> All your StationDeck data — daily records,
-                generated reports, and the database — is stored <em>only on this computer</em>.
-                If this computer is lost, stolen, or damaged and you have no backup,
-                that data cannot be recovered. We strongly recommend copying your
-                <code>data\</code> folder to a USB drive or Google Drive at least once a month.
+                ⚠️ <strong>Important:</strong> Automatic backups live on <em>this same
+                computer</em> — they protect against mistakes (bad imports, accidental
+                Clear All Data), not against theft, fire, or disk failure. Once a month,
+                copy the <code>backups\</code> folder to a USB drive or Google Drive.
             </div>
             <h3 class="backup-steps-title">How to back up your data (3 steps)</h3>
             <ol class="backup-steps">

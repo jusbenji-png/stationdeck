@@ -322,6 +322,19 @@ def main():
 
     threading.Thread(target=_delayed_update_check, daemon=True).start()
 
+    # ── Automatic weekly data backup (background, never blocks startup) ──
+    def _auto_backup():
+        time.sleep(15)   # let the app settle first
+        try:
+            from config.settings import DATA_DIR
+            from src.backup import run_backup_if_due
+            if run_backup_if_due(DATA_DIR):
+                _log("Weekly data backup created in backups folder.")
+        except Exception as e:
+            _log(f"WARNING: Automatic backup failed: {e}")
+
+    threading.Thread(target=_auto_backup, daemon=True).start()
+
     # Keep main thread alive so the daemon Flask thread keeps running
     try:
         while flask_thread.is_alive():
